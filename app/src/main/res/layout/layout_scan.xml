@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
+
+    <com.localscanner.qr.ScanOverlayView
+        android:id="@+id/scanOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_top_bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <ImageButton
+            android:id="@+id/btnMenu"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_menu"
+            android:src="@drawable/ic_menu"
+            app:tint="@color/white" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/btnGallery"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_gallery"
+            android:src="@drawable/ic_image"
+            app:tint="@color/white" />
+
+        <ImageButton
+            android:id="@+id/btnFlash"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_flash"
+            android:src="@drawable/ic_flash"
+            app:tint="@color/white" />
+
+        <ImageButton
+            android:id="@+id/btnSwitch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_circle_btn"
+            android:contentDescription="@string/cd_switch"
+            android:src="@drawable/ic_switch"
+            app:tint="@color/white" />
+
+        <ImageButton
+            android:id="@+id/btnBatch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_batch"
+            android:src="@drawable/ic_batch"
+            android:visibility="gone"
+            app:tint="@color/white" />
+    </LinearLayout>
+
+    <SeekBar
+        android:id="@+id/zoomSeek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="28dp"
+        android:max="100"
+        android:progressTint="@color/colorPrimary"
+        android:thumbTint="@color/colorPrimary" />
+
+    <LinearLayout
+        android:id="@+id/permissionPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/windowBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:contentDescription="@string/scan"
+            android:src="@drawable/ic_scan"
+            app:tint="@color/colorPrimary" />
+
+        <TextView
+            android:id="@+id/permissionMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="@string/camera_permission_rationale"
+            android:textColor="@color/textPrimary"
+            android:textSize="16sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnGrant"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/grant_permission"
+            android:textColor="@color/white"
+            app:backgroundTint="@color/colorPrimary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAppSettings"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/open_settings"
+            android:textColor="@color/colorPrimary"
+            app:strokeColor="@color/colorPrimary" />
+    </LinearLayout>
+</FrameLayout>

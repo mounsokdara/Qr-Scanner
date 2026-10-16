@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/windowBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/rowBatch"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/batch_scan_mode" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/batch_scan_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkBatch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowAutofocus"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/use_auto_focus" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkAutofocus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowTouch"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/touch_focus" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/touch_focus_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkTouch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowDuplicates"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/keep_duplicates" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkDuplicates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowCustom"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/custom_action" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/valueCustom"
+                style="@style/SettingsValue" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowBrowser"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/use_in_app_browser" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkBrowser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowAddHistory"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/add_scans_to_history" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkAddHistory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowAutoOpen"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/auto_open_urls" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkAutoOpen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowCamera"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/camera" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/valueCamera"
+                style="@style/SettingsValue" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowEngine"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/search_engine" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/valueEngine"
+                style="@style/SettingsValue" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowCountry"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/search_country" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/valueCountry"
+                style="@style/SettingsValue" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+    </LinearLayout>
+</ScrollView>
