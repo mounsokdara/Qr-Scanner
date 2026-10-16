@@ -1,0 +1,2 @@
+-keep class com.google.zxing.** { *; }
+-keepclassmembers class com.google.zxing.** { *; }

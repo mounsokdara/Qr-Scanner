@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.QrScanner" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/colorPrimary</item>
+        <item name="colorSecondaryVariant">@color/colorPrimaryDark</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSurface">@color/cardBackground</item>
+        <item name="colorOnSurface">@color/textPrimary</item>
+        <item name="colorError">@color/laser</item>
+        <item name="colorOnError">@color/white</item>
+        <item name="android:colorBackground">@color/windowBackground</item>
+        <item name="android:windowBackground">@color/windowBackground</item>
+        <item name="android:statusBarColor">@color/colorPrimary</item>
+        <item name="android:navigationBarColor">@color/windowBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColorSecondary">@color/textMuted</item>
+        <item name="android:textColorHint">@color/textMuted</item>
+        <item name="android:editTextColor">@color/textPrimary</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
+        <item name="colorControlActivated">@color/colorPrimary</item>
+        <item name="colorControlNormal">@color/textMuted</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="bottomSheetDialogTheme">@style/Theme.QrScanner.BottomSheet</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.App.Dialog</item>
+    </style>
+
+    <style name="ThemeOverlay.App.Dialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="colorSurface">@color/cardBackground</item>
+        <item name="colorOnSurface">@color/textPrimary</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+        <item name="android:textColor">@color/textPrimary</item>
+        <item name="android:background">@color/cardBackground</item>
+    </style>
+
+    <style name="Theme.QrScanner.BottomSheet" parent="Theme.MaterialComponents.DayNight.BottomSheetDialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/cardBackground</item>
+        <item name="bottomSheetStyle">@style/Widget.App.BottomSheet.Modal</item>
+        <item name="colorSurface">@color/cardBackground</item>
+        <item name="android:textColorPrimary">@color/textPrimary</item>
+    </style>
+
+    <style name="Widget.App.BottomSheet.Modal" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="backgroundTint">@color/cardBackground</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.App.LargeTop</item>
+    </style>
+
+    <style name="ShapeAppearance.App.LargeTop" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">16dp</item>
+        <item name="cornerSizeTopRight">16dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="SettingsRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:minHeight">64dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="SettingsTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/textPrimary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="SettingsSub">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textColor">@color/textMuted</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="SettingsValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:maxWidth">150dp</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:gravity">end</item>
+        <item name="android:textColor">@color/colorPrimary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+</resources>
