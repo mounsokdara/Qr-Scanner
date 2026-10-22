@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0
+## Unreleased (app stays at 1.0.0 while in development)
 
 ### New
 - Smart result actions by content type: **Connect** to Wi-Fi (Android 11+), **Add contact**, **Add event**, **Call**, **Send email**, **Send SMS**, **Show map**.
@@ -13,6 +13,7 @@
 - Unit tests and a CI workflow that builds on every branch and pull request.
 
 ### Fixed
+- Tap-to-focus: now meters focus and exposure at the tap point, no longer fights CameraX over the AF mode, and shows a focus ring (green on success, red on failure).
 - Scanning a contact (vCard) or calendar event QR offered a web **Search** of the whole card; it now opens the Contacts / Calendar editor instead.
 - In-app browser drew under the status bar on Android 15 (edge-to-edge is now handled).
 - "Export PNG" from the result sheet failed on Android 8-9 because the storage permission was never requested.

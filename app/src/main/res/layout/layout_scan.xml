@@ -18,6 +18,15 @@
         android:clickable="false"
         android:focusable="false" />
 
+    <View
+        android:id="@+id/focusRing"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:background="@drawable/bg_focus_ring"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="invisible" />
+
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"

@@ -166,6 +166,10 @@ class ScanFragment : Fragment() {
             // Provider may already be shut down.
         }
         camera = null
+        _binding?.focusRing?.let {
+            it.animate().cancel()
+            it.visibility = View.INVISIBLE
+        }
         super.onPause()
     }
 
@@ -312,13 +316,14 @@ class ScanFragment : Fragment() {
     }
 
     private fun <T> applyFocus(builder: ExtendableBuilder<T>, autoFocus: Boolean) {
-        val mode = if (autoFocus) {
-            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
-        } else {
-            CaptureRequest.CONTROL_AF_MODE_OFF
-        }
+        // With autofocus on, CameraX already runs continuous AF and needs to own the AF mode so
+        // tap-to-focus can trigger a one-shot focus. Only override it to turn autofocus off.
+        if (autoFocus) return
         Camera2Interop.Extender(builder)
-            .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, mode)
+            .setCaptureRequestOption(
+                CaptureRequest.CONTROL_AF_MODE,
+                CaptureRequest.CONTROL_AF_MODE_OFF
+            )
     }
 
     private fun resolveCameraId(provider: ProcessCameraProvider): String? {
@@ -382,13 +387,54 @@ class ScanFragment : Fragment() {
         try {
             val factory = binding.previewView.meteringPointFactory
             val point = factory.createPoint(x, y)
-            val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            )
                 .setAutoCancelDuration(3, TimeUnit.SECONDS)
                 .build()
-            active.cameraControl.startFocusAndMetering(action)
+            if (!active.cameraInfo.isFocusMeteringSupported(action)) return
+            showFocusRing(x, y)
+            val future = active.cameraControl.startFocusAndMetering(action)
+            future.addListener({
+                if (_binding == null) return@addListener
+                val success = try {
+                    future.get().isFocusSuccessful
+                } catch (_: Exception) {
+                    // Cancelled by a newer tap or the camera was unbound.
+                    return@addListener
+                }
+                finishFocusRing(success)
+            }, ContextCompat.getMainExecutor(requireContext()))
         } catch (_: Exception) {
             // Some cameras do not support touch focus.
         }
+    }
+
+    private fun showFocusRing(x: Float, y: Float) {
+        val ring = binding.focusRing
+        ring.animate().cancel()
+        ring.backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+        ring.translationX = x - ring.width / 2f
+        ring.translationY = y - ring.height / 2f
+        ring.scaleX = 1.5f
+        ring.scaleY = 1.5f
+        ring.alpha = 1f
+        ring.visibility = View.VISIBLE
+        ring.animate().scaleX(1f).scaleY(1f).setDuration(200L).start()
+    }
+
+    private fun finishFocusRing(success: Boolean) {
+        val ring = _binding?.focusRing ?: return
+        val color = if (success) Color.parseColor("#4CAF50") else Color.parseColor("#E53935")
+        ring.backgroundTintList = ColorStateList.valueOf(color)
+        ring.animate().cancel()
+        ring.animate()
+            .alpha(0f)
+            .setStartDelay(600L)
+            .setDuration(300L)
+            .withEndAction { ring.visibility = View.INVISIBLE }
+            .start()
     }
 
     private fun analyze(image: ImageProxy) {
