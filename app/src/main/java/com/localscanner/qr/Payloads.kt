@@ -104,13 +104,14 @@ object Payloads {
         return buildString {
             append("BEGIN:VCARD\n")
             append("VERSION:3.0\n")
-            append("N:").append(escapeVcard(name)).append('\n')
+            val (given, family) = splitName(name)
+            append("N:").append(escapeVcard(family)).append(';').append(escapeVcard(given)).append(";;;\n")
             append("FN:").append(escapeVcard(name)).append('\n')
             if (organization.isNotBlank()) append("ORG:").append(escapeVcard(organization)).append('\n')
             if (phone.isNotBlank()) append("TEL:").append(escapeVcard(phone)).append('\n')
             if (email.isNotBlank()) append("EMAIL:").append(escapeVcard(email)).append('\n')
             if (address.isNotBlank()) append("ADR:;;").append(escapeVcard(address)).append(";;;;\n")
-            if (website.isNotBlank()) append("URL:").append(escapeVcard(website)).append('\n')
+            if (website.isNotBlank()) append("URL:").append(website.trim().replace(Regex("\\s+"), "")).append('\n')
             if (note.isNotBlank()) append("NOTE:").append(escapeVcard(note)).append('\n')
             append("END:VCARD")
         }
@@ -410,6 +411,14 @@ object Payloads {
         val text = "WIFI:T:$type;S:${escapeWifi(ssid)};P:${escapeWifi(password)};H:${if (hidden) "true" else "false"};;"
         if (!Encoder.canEncode(text, BarcodeFormat.QR_CODE)) return null
         return BuiltCode(text, BarcodeFormat.QR_CODE)
+    }
+
+    /** Splits "First Middle Last" into (given, family). A single word is treated as the family name. */
+    private fun splitName(name: String): Pair<String, String> {
+        val trimmed = name.trim()
+        val index = trimmed.lastIndexOf(' ')
+        if (index <= 0) return "" to trimmed
+        return trimmed.substring(0, index).trim() to trimmed.substring(index + 1).trim()
     }
 
     private fun escapeVcard(value: String): String {

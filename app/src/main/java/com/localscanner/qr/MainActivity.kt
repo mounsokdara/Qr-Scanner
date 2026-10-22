@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
@@ -38,6 +39,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         store = Store(this)
+        // Android 15 enforces edge-to-edge; keep a branded bar behind the status icons.
+        binding.drawerLayout.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
         if (savedInstanceState != null) {
             currentNavId = savedInstanceState.getInt(STATE_NAV, R.id.nav_scan)
         }
@@ -69,6 +72,8 @@ class MainActivity : AppCompatActivity() {
     fun openDrawer() {
         binding.drawerLayout.openDrawer(GravityCompat.START)
     }
+
+    fun toolbarMenu(): android.view.Menu = binding.toolbar.menu
 
     fun applyToolbar(
         title: String?,
@@ -129,7 +134,8 @@ class MainActivity : AppCompatActivity() {
             Actions.snackbar(binding.contentFrame, message)
             return false
         }
-        if (settings.autoOpenUrls && Payloads.isHttpUrl(text.trim())) {
+        // Never auto-open links that look suspicious; the result sheet shows why instead.
+        if (settings.autoOpenUrls && Payloads.isHttpUrl(text.trim()) && LinkSafety.check(text).isEmpty()) {
             Actions.openContent(this, text, settings)
         }
         return showResultSheet(text, format, outcome?.record?.id)

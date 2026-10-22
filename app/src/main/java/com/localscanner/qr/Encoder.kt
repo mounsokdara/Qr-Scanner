@@ -26,18 +26,23 @@ object Encoder {
         }
     }
 
-    fun encode(contents: String, format: BarcodeFormat): Bitmap? {
+    fun encode(
+        contents: String,
+        format: BarcodeFormat,
+        foreground: Int = Color.BLACK,
+        ecLevel: ErrorCorrectionLevel = ErrorCorrectionLevel.M
+    ): Bitmap? {
         if (contents.isEmpty()) return null
         return try {
             val (width, height) = dimensions(format)
-            val matrix = MultiFormatWriter().encode(contents, format, width, height, hints(format))
+            val matrix = MultiFormatWriter().encode(contents, format, width, height, hints(format, ecLevel))
             val w = matrix.width
             val h = matrix.height
             val pixels = IntArray(w * h)
             for (y in 0 until h) {
                 val offset = y * w
                 for (x in 0 until w) {
-                    pixels[offset + x] = if (matrix.get(x, y)) Color.BLACK else Color.WHITE
+                    pixels[offset + x] = if (matrix.get(x, y)) foreground else Color.WHITE
                 }
             }
             Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
@@ -46,12 +51,15 @@ object Encoder {
         }
     }
 
-    private fun hints(format: BarcodeFormat): Map<EncodeHintType, Any> {
+    private fun hints(
+        format: BarcodeFormat,
+        ecLevel: ErrorCorrectionLevel = ErrorCorrectionLevel.M
+    ): Map<EncodeHintType, Any> {
         val hints = HashMap<EncodeHintType, Any>()
         hints[EncodeHintType.MARGIN] = 1
         hints[EncodeHintType.CHARACTER_SET] = "UTF-8"
         if (format == BarcodeFormat.QR_CODE) {
-            hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.M
+            hints[EncodeHintType.ERROR_CORRECTION] = ecLevel
         }
         return hints
     }

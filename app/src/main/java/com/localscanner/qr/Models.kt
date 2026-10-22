@@ -20,7 +20,9 @@ data class AppSettings(
     val autoOpenUrls: Boolean = false,
     val cameraId: String = "",
     val searchEngine: String = "device",
-    val searchCountry: String = "US"
+    val searchCountry: String = "US",
+    val soundOnScan: Boolean = true,
+    val vibrateOnScan: Boolean = true
 )
 
 data class MyQrProfile(

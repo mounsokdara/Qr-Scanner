@@ -36,6 +36,8 @@ class SettingsFragment : Fragment() {
         binding.rowBrowser.setOnClickListener { binding.checkBrowser.toggle() }
         binding.rowAddHistory.setOnClickListener { binding.checkAddHistory.toggle() }
         binding.rowAutoOpen.setOnClickListener { binding.checkAutoOpen.toggle() }
+        binding.rowSound.setOnClickListener { binding.checkSound.toggle() }
+        binding.rowVibrate.setOnClickListener { binding.checkVibrate.toggle() }
         binding.checkBatch.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkAutofocus.setOnCheckedChangeListener { _, _ ->
             refreshTouch()
@@ -46,6 +48,8 @@ class SettingsFragment : Fragment() {
         binding.checkBrowser.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkAddHistory.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkAutoOpen.setOnCheckedChangeListener { _, _ -> persist() }
+        binding.checkSound.setOnCheckedChangeListener { _, _ -> persist() }
+        binding.checkVibrate.setOnCheckedChangeListener { _, _ -> persist() }
         binding.rowCustom.setOnClickListener { editCustomAction() }
         binding.rowCamera.setOnClickListener { pickCamera() }
         binding.rowEngine.setOnClickListener { pickEngine() }
@@ -77,6 +81,8 @@ class SettingsFragment : Fragment() {
         binding.checkBrowser.isChecked = settings.useInAppBrowser
         binding.checkAddHistory.isChecked = settings.addScansToHistory
         binding.checkAutoOpen.isChecked = settings.autoOpenUrls
+        binding.checkSound.isChecked = settings.soundOnScan
+        binding.checkVibrate.isChecked = settings.vibrateOnScan
         binding.valueCustom.text = settings.customActionUrl.ifBlank { getString(R.string.none) }
         binding.valueCamera.text = cameraLabel(settings.cameraId)
         binding.valueEngine.text = engineLabel(settings.searchEngine)
@@ -95,7 +101,9 @@ class SettingsFragment : Fragment() {
                 keepDuplicates = binding.checkDuplicates.isChecked,
                 useInAppBrowser = binding.checkBrowser.isChecked,
                 addScansToHistory = binding.checkAddHistory.isChecked,
-                autoOpenUrls = binding.checkAutoOpen.isChecked
+                autoOpenUrls = binding.checkAutoOpen.isChecked,
+                soundOnScan = binding.checkSound.isChecked,
+                vibrateOnScan = binding.checkVibrate.isChecked
             )
         )
     }

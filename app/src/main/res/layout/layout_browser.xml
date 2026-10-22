@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/browserRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/windowBackground"
@@ -9,11 +10,14 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/browserToolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="wrap_content"
         android:background="@color/colorPrimary"
+        android:minHeight="?attr/actionBarSize"
         android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
         app:navigationIcon="@drawable/ic_back"
         app:navigationIconTint="@color/white"
+        app:popupTheme="@style/ThemeOverlay.MaterialComponents.Dark"
+        app:subtitleTextColor="@color/headerSub"
         app:titleTextColor="@color/white" />
 
     <ProgressBar

@@ -219,7 +219,9 @@ class Store(context: Context) {
                 autoOpenUrls = bool(obj, "autoOpenUrls", false),
                 cameraId = obj.optString("cameraId", ""),
                 searchEngine = obj.optString("searchEngine", "device"),
-                searchCountry = obj.optString("searchCountry", "US")
+                searchCountry = obj.optString("searchCountry", "US"),
+                soundOnScan = bool(obj, "soundOnScan", true),
+                vibrateOnScan = bool(obj, "vibrateOnScan", true)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -239,6 +241,8 @@ class Store(context: Context) {
             .put("cameraId", settings.cameraId)
             .put("searchEngine", settings.searchEngine)
             .put("searchCountry", settings.searchCountry)
+            .put("soundOnScan", settings.soundOnScan)
+            .put("vibrateOnScan", settings.vibrateOnScan)
     }
 
     private fun readMyQr(): MyQrProfile {
