@@ -43,6 +43,34 @@ object Parsers {
         }
     }
 
+    /** A short one-line detail for a code (host, SSID, contact name...), used in chips and headers. */
+    fun detail(raw: String, maxLen: Int = 28): String {
+        val t = raw.trim()
+        val value = when (kindOf(t)) {
+            ScanKind.URL -> {
+                val full = if (t.startsWith("www.", ignoreCase = true)) "https://$t" else t
+                try {
+                    java.net.URI(full).host?.removePrefix("www.") ?: t
+                } catch (_: Exception) {
+                    t
+                }
+            }
+            ScanKind.WIFI -> {
+                val match = Regex("""(?:^|;)S:((?:\\.|[^;\\])*)""").find(t.substring(5))
+                match?.groupValues?.get(1)?.replace(Regex("""\\(.)"""), "$1").orEmpty()
+            }
+            ScanKind.CONTACT -> parseVCard(t)?.name.orEmpty()
+            ScanKind.EVENT -> parseVEvent(t)?.title.orEmpty()
+            ScanKind.EMAIL -> t.substringAfter(':').substringBefore('?')
+            ScanKind.SMS -> t.substringAfter(':').substringBefore(':').substringBefore('?')
+            ScanKind.PHONE -> t.substringAfter(':')
+            ScanKind.GEO -> t.substringAfter(':').substringBefore('?')
+            ScanKind.TEXT -> t
+        }
+        val oneLine = value.replace(Regex("\\s+"), " ").trim()
+        return if (oneLine.length > maxLen) oneLine.take(maxLen - 1).trimEnd() + "…" else oneLine
+    }
+
     fun parseVCard(raw: String): VCardInfo? {
         if (!raw.trim().startsWith("BEGIN:VCARD", ignoreCase = true)) return null
         var fn = ""

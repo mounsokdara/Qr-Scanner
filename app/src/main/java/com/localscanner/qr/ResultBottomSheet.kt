@@ -38,12 +38,18 @@ class ResultBottomSheet : BottomSheetDialogFragment() {
         val text = requireArguments().getString(ARG_TEXT).orEmpty()
         val formatName = requireArguments().getString(ARG_FORMAT).orEmpty()
         val kind = Parsers.kindOf(text)
-        val kindLabel = kindLabel(kind)
+        val kindLabel = Labels.kindName(requireContext(), kind)
         binding.sheetFormat.text = if (kindLabel == null) {
             Payloads.formatLabel(formatName)
         } else {
             getString(R.string.format_and_kind, Payloads.formatLabel(formatName), kindLabel)
         }
+        binding.sheetTitle.text = if (kind == ScanKind.TEXT) {
+            Labels.headline(requireContext(), text, formatName)
+        } else {
+            Parsers.detail(text, 40).ifEmpty { Labels.headline(requireContext(), text, formatName) }
+        }
+        binding.sheetKindIcon.setImageResource(iconFor(kind, formatName))
         binding.sheetText.text = text
         binding.sheetText.setTextIsSelectable(true)
         val store = Store(requireContext())
@@ -90,22 +96,33 @@ class ResultBottomSheet : BottomSheetDialogFragment() {
         return binding.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        // On tablets and landscape phones keep the sheet fully open and at a readable width.
+        val sheet = dialog as? com.google.android.material.bottomsheet.BottomSheetDialog ?: return
+        sheet.behavior.apply {
+            state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            skipCollapsed = true
+            maxWidth = (640 * resources.displayMetrics.density).toInt()
+        }
+    }
+
     override fun onDismiss(dialog: android.content.DialogInterface) {
         super.onDismiss(dialog)
         (activity as? MainActivity)?.onResultSheetDismissed()
     }
 
-    private fun kindLabel(kind: ScanKind): String? {
+    private fun iconFor(kind: ScanKind, format: String): Int {
         return when (kind) {
-            ScanKind.URL -> getString(R.string.type_url)
-            ScanKind.WIFI -> getString(R.string.type_wifi)
-            ScanKind.CONTACT -> getString(R.string.type_contact)
-            ScanKind.EVENT -> getString(R.string.type_calendar)
-            ScanKind.EMAIL -> getString(R.string.type_email)
-            ScanKind.SMS -> getString(R.string.type_sms)
-            ScanKind.PHONE -> getString(R.string.type_phone)
-            ScanKind.GEO -> getString(R.string.type_geo)
-            ScanKind.TEXT -> null
+            ScanKind.URL -> R.drawable.ic_link
+            ScanKind.WIFI -> R.drawable.ic_wifi
+            ScanKind.CONTACT -> R.drawable.ic_person
+            ScanKind.EVENT -> R.drawable.ic_event
+            ScanKind.EMAIL -> R.drawable.ic_email
+            ScanKind.SMS -> R.drawable.ic_sms
+            ScanKind.PHONE -> R.drawable.ic_phone
+            ScanKind.GEO -> R.drawable.ic_place
+            ScanKind.TEXT -> if (format == "QR_CODE") R.drawable.ic_text else R.drawable.ic_barcode
         }
     }
 

@@ -219,6 +219,7 @@ class MainActivity : AppCompatActivity() {
             supportFragmentManager.popBackStack()
             return
         }
+        if ((currentFragment() as? ScanFragment)?.handleBack() == true) return
         val current = currentFragment()
         if (current !is ScanFragment) {
             showScan()
@@ -236,35 +237,35 @@ class MainActivity : AppCompatActivity() {
         io.execute {
             var bitmap: Bitmap? = null
             var unreadable = false
-            val decoded = try {
+            var codes: List<DetectedCode> = emptyList()
+            try {
                 bitmap = Decoder.loadOrientedBitmap(appContext, uri)
                 if (bitmap == null) {
                     unreadable = true
-                    null
                 } else {
-                    Decoder.decodeBitmap(bitmap)
+                    codes = Decoder.decodeStill(bitmap)
                 }
             } catch (_: Exception) {
                 if (bitmap == null) unreadable = true
-                null
-            } finally {
-                if (bitmap != null && !bitmap!!.isRecycled) {
-                    bitmap!!.recycle()
-                }
             }
             mainHandler.post {
-                if (isDestroyed) return@post
-                val text = decoded?.text?.trim().orEmpty()
-                if (decoded == null || text.isEmpty()) {
-                    val message = if (unreadable) R.string.could_not_open_image else R.string.no_code_found
-                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-                    (currentFragment() as? ScanFragment)?.onImagePickCancelled()
-                } else {
-                    Actions.feedback(this)
-                    val pause = onCodeDetected(text, decoded.barcodeFormat.name, batch = false)
-                    val scan = currentFragment() as? ScanFragment
-                    if (pause) scan?.pauseScanning() else scan?.onImagePickCancelled()
+                val picture = bitmap
+                if (isDestroyed || picture == null || codes.isEmpty()) {
+                    if (picture != null && !picture.isRecycled) picture.recycle()
+                    if (!isDestroyed) {
+                        val message = if (unreadable) R.string.could_not_open_image else R.string.no_code_found
+                        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                        (currentFragment() as? ScanFragment)?.onImagePickCancelled()
+                    }
+                    return@post
                 }
+                if (currentFragment() !is ScanFragment) showScan()
+                val scan = currentFragment() as? ScanFragment
+                if (scan == null) {
+                    picture.recycle()
+                    return@post
+                }
+                scan.showStill(picture, codes)
             }
         }
     }

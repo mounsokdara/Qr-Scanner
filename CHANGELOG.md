@@ -3,6 +3,14 @@
 ## Unreleased (app stays at 1.0.0 while in development)
 
 ### New
+- **Google Lens-style scanner**: every code in view gets a glowing gradient border and a short label chip (for example "Website · example.com"). Tap a code to see its details. A single code is opened automatically after a short hold.
+- **Multiple codes at once**: all QR codes in the frame are detected live; barcodes, Data Matrix, Aztec and PDF417 are found too when you freeze the frame or import an image.
+- **Freeze button** (shutter) that takes a picture of the current frame without saving anything to storage, then marks every code in it. Tap the ✕ or press Back to return to the live camera.
+- **Import image** now shows the picture with a glowing box around every code, instead of opening only the first one.
+- Risky links get an amber/red glow and a warning marker on their label.
+- Result sheet header with a type icon and short title, centred and capped in width on tablets.
+- Tablet layouts: history and the create list become multi-column grids, forms and settings keep a readable width.
+- Settings: "Scan multiple codes" and "Auto scan".
 - Smart result actions by content type: **Connect** to Wi-Fi (Android 11+), **Add contact**, **Add event**, **Call**, **Send email**, **Send SMS**, **Show map**.
 - Link safety banner on scanned URLs (http, raw IP, punycode / look-alike characters, URL shorteners, `user@host` tricks). Suspicious links are no longer auto-opened.
 - Search box in History and Favorites.

@@ -37,6 +37,7 @@ class CreateFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        UiUtil.constrainWidth(binding.root, 640)
         val specs = fieldsFor(kind)
         val boxes = listOf(
             binding.layout1, binding.layout2, binding.layout3,

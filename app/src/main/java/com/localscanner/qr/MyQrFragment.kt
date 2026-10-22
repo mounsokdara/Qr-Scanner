@@ -59,6 +59,8 @@ class MyQrFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        UiUtil.constrainWidth(binding.formGroup, 640)
+        UiUtil.constrainWidth(binding.resultGroup, 560)
         store = (requireActivity() as MainActivity).store
         binding.inputPhone.inputType = InputType.TYPE_CLASS_PHONE
         binding.inputEmail.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS

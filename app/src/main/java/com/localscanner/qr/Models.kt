@@ -22,7 +22,9 @@ data class AppSettings(
     val searchEngine: String = "device",
     val searchCountry: String = "US",
     val soundOnScan: Boolean = true,
-    val vibrateOnScan: Boolean = true
+    val vibrateOnScan: Boolean = true,
+    val multiScan: Boolean = true,
+    val autoScan: Boolean = true
 )
 
 data class MyQrProfile(

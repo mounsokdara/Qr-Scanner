@@ -91,7 +91,12 @@ class HistoryFragment : Fragment() {
             },
             onMore = { record, anchor -> showItemMenu(record, anchor) }
         )
-        list.layoutManager = LinearLayoutManager(requireContext())
+        val spans = UiUtil.columns(list, 400, 3)
+        list.layoutManager = androidx.recyclerview.widget.GridLayoutManager(requireContext(), spans).apply {
+            spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int = if (adapter.isHeader(position)) spans else 1
+            }
+        }
         list.adapter = adapter
     }
 

@@ -18,6 +18,8 @@ import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.Result
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.multi.GenericMultipleBarcodeReader
+import com.google.zxing.multi.qrcode.QRCodeMultiReader
 
 object Decoder {
     val FORMATS: List<BarcodeFormat> = listOf(
@@ -38,22 +40,124 @@ object Decoder {
 
     private var invertTick = 0
 
-    fun decodeImageProxy(image: ImageProxy): Result? {
+    /** Codes found in one camera frame, in the upright (rotated) coordinate space of that frame. */
+    class LiveFrame(val codes: List<DetectedCode>, val width: Int, val height: Int)
+
+    /**
+     * Fast per-frame decode. With [multi] on it finds every QR code in view; otherwise (or when no
+     * QR is found) it falls back to the single-symbol reader that handles all barcode formats.
+     */
+    fun decodeLive(image: ImageProxy, multi: Boolean): LiveFrame? {
         val source = try {
             yuvToLuminance(image)
         } catch (_: Exception) {
             null
         } ?: return null
-        val direct = decodeFast(source)
-        if (direct != null) return direct
-        // Inverted (light-on-dark) codes are rare; trying them on every frame doubles the CPU cost.
-        invertTick = (invertTick + 1) % 3
-        if (invertTick != 0) return null
+        var codes = decodeLiveSource(source, multi)
+        if (codes.isEmpty()) {
+            // Inverted (light-on-dark) codes are rare; trying them on every frame doubles the CPU cost.
+            invertTick = (invertTick + 1) % 3
+            if (invertTick == 0) {
+                codes = try {
+                    decodeLiveSource(source.invert(), multi)
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }
+        if (codes.isEmpty()) return null
+        return LiveFrame(codes, source.width, source.height)
+    }
+
+    private fun decodeLiveSource(source: LuminanceSource, multi: Boolean): List<DetectedCode> {
+        val bitmap = BinaryBitmap(HybridBinarizer(source))
+        if (multi) {
+            val found = multiQr(bitmap, baseHints(false))
+            if (found.isNotEmpty()) return CodeGeometry.dedupe(found)
+        }
+        val single = decodeSingle(bitmap) ?: return emptyList()
+        return listOfNotNull(toCode(single))
+    }
+
+    /**
+     * Thorough decode of a still image (frozen camera frame or imported picture). Finds every
+     * code, of every supported format, trying both polarities and two binarizers.
+     */
+    fun decodeStill(bitmap: Bitmap): List<DetectedCode> {
+        val source = try {
+            bitmapToSource(bitmap)
+        } catch (_: Exception) {
+            null
+        } ?: return emptyList()
+        val variants = ArrayList<LuminanceSource>(2)
+        variants.add(source)
+        try {
+            variants.add(source.invert())
+        } catch (_: Exception) {
+            // Inverted pass is optional.
+        }
+        for (variant in variants) {
+            val attempts = listOf<() -> BinaryBitmap>(
+                { BinaryBitmap(HybridBinarizer(variant)) },
+                { BinaryBitmap(GlobalHistogramBinarizer(variant)) }
+            )
+            for (make in attempts) {
+                val found = decodeAllThorough(make())
+                if (found.isNotEmpty()) return CodeGeometry.dedupe(found)
+            }
+        }
+        return emptyList()
+    }
+
+    private fun decodeAllThorough(bitmap: BinaryBitmap): List<DetectedCode> {
+        val hints = baseHints(true)
+        val out = ArrayList<DetectedCode>()
+        try {
+            val reader = MultiFormatReader()
+            reader.setHints(hints)
+            for (result in GenericMultipleBarcodeReader(reader).decodeMultiple(bitmap, hints)) {
+                toCode(result)?.let { out.add(it) }
+            }
+        } catch (_: Exception) {
+            // NotFoundException just means nothing was found on this pass.
+        }
+        out.addAll(multiQr(bitmap, hints))
+        return out
+    }
+
+    private fun multiQr(bitmap: BinaryBitmap, hints: Map<DecodeHintType, Any>): List<DetectedCode> {
         return try {
-            decodeFast(source.invert())
+            QRCodeMultiReader().decodeMultiple(bitmap, hints).mapNotNull { toCode(it) }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun decodeSingle(bitmap: BinaryBitmap): Result? {
+        val reader = MultiFormatReader()
+        reader.setHints(baseHints(false))
+        return try {
+            reader.decodeWithState(bitmap)
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun toCode(result: Result): DetectedCode? {
+        val text = result.text?.trim().orEmpty()
+        if (text.isEmpty()) return null
+        val format = result.barcodeFormat?.name ?: return null
+        val points = result.resultPoints?.filterNotNull()?.map { Pt(it.x, it.y) }.orEmpty()
+        if (points.isEmpty()) return null
+        return DetectedCode(text, format, points)
+    }
+
+    private fun baseHints(thorough: Boolean): HashMap<DecodeHintType, Any> {
+        val hints = HashMap<DecodeHintType, Any>()
+        hints[DecodeHintType.POSSIBLE_FORMATS] = FORMATS
+        hints[DecodeHintType.CHARACTER_SET] = "UTF-8"
+        if (thorough) hints[DecodeHintType.TRY_HARDER] = true
+        return hints
     }
 
     fun loadOrientedBitmap(context: Context, uri: Uri): Bitmap? {
@@ -63,25 +167,6 @@ object Decoder {
             decoded.recycle()
         }
         return oriented
-    }
-
-    fun decodeBitmap(bitmap: Bitmap): Result? {
-        val rotations = intArrayOf(0, 90, 180, 270)
-        for (degrees in rotations) {
-            val candidate = if (degrees == 0) bitmap else rotateBitmap(bitmap, degrees)
-            try {
-                val source = bitmapToSource(candidate) ?: continue
-                val result = decodeThorough(source)
-                if (result != null) return result
-            } catch (_: Exception) {
-                // try the next rotation
-            } finally {
-                if (candidate !== bitmap && !candidate.isRecycled) {
-                    candidate.recycle()
-                }
-            }
-        }
-        return null
     }
 
     private fun yuvToLuminance(image: ImageProxy): LuminanceSource? {
@@ -140,58 +225,6 @@ object Decoder {
             270 -> source.rotateCounterClockwise()
             else -> source
         }
-    }
-
-    private fun decodeFast(source: LuminanceSource): Result? {
-        val reader = MultiFormatReader()
-        val hints = HashMap<DecodeHintType, Any>()
-        hints[DecodeHintType.POSSIBLE_FORMATS] = FORMATS
-        hints[DecodeHintType.CHARACTER_SET] = "UTF-8"
-        reader.setHints(hints)
-        return try {
-            reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-        } catch (_: NotFoundException) {
-            null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun decodeThorough(source: LuminanceSource): Result? {
-        val reader = MultiFormatReader()
-        val hints = HashMap<DecodeHintType, Any>()
-        hints[DecodeHintType.POSSIBLE_FORMATS] = FORMATS
-        hints[DecodeHintType.CHARACTER_SET] = "UTF-8"
-        hints[DecodeHintType.TRY_HARDER] = true
-        try {
-            hints[DecodeHintType.ALSO_INVERTED] = true
-        } catch (_: Exception) {
-            // Hint stays optional if a device build rejects it.
-        }
-        reader.setHints(hints)
-        val sources = ArrayList<LuminanceSource>()
-        sources.add(source)
-        try {
-            sources.add(source.invert())
-        } catch (_: Exception) {
-            // Ignore invert failures.
-        }
-        for (candidate in sources) {
-            val bitmaps = listOf(
-                BinaryBitmap(HybridBinarizer(candidate)),
-                BinaryBitmap(GlobalHistogramBinarizer(candidate))
-            )
-            for (bitmap in bitmaps) {
-                try {
-                    return reader.decodeWithState(bitmap)
-                } catch (_: NotFoundException) {
-                    reader.reset()
-                } catch (_: Exception) {
-                    reader.reset()
-                }
-            }
-        }
-        return null
     }
 
     private fun decodeSampled(context: Context, uri: Uri): Bitmap? {

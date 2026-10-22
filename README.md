@@ -20,6 +20,7 @@ Minimum Android version is 8.0 (API 26). A camera is optional. **Scan image** st
 - History and favorites, rename, delete with undo, CSV/TXT/PNG export and CSV import
 - My QR contact card, in-app browser, search engines, custom action URL
 - Smart actions on scan: connect to Wi-Fi (Android 11+), add contact, add calendar event, call, email, SMS, show on map
+- Google Lens-style scanning: glowing gradient boxes and label chips on every code, tap a code for details, freeze-frame button, import-image preview with all codes marked
 - Link safety warnings for http links, raw IP addresses, look-alike (punycode/unicode) hosts, shorteners and `user@host` tricks. Risky links are never auto-opened
 - History search, pinch-to-zoom, beep/vibrate toggles (silent mode respected)
 - QR style options when creating codes: colour and error-correction level

@@ -5,6 +5,7 @@ package com.localscanner.qr
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -14,6 +15,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Size
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -24,12 +26,16 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.ExtendableBuilder
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -51,8 +57,26 @@ class ScanFragment : Fragment() {
     private var torchOn = false
     private var batchActive = false
     @Volatile private var paused = false
+    @Volatile private var frozen = false
+    @Volatile private var multiScan = true
+    @Volatile private var frontFacing = false
+    private var autoScan = true
+    private var batchEnabled = false
     private var lastText = ""
     private var lastAt = 0L
+    private var stableText: String? = null
+    private var stableSince = 0L
+    private val seen = HashMap<String, Long>()
+    private val openedInStill = HashSet<String>()
+    private var stillBitmap: Bitmap? = null
+    private var stillAnalyzing = false
+    private var stillCount = 0
+    private var stillGeneration = 0
+    private lateinit var stillExecutor: ExecutorService
+    private val clearOverlay = Runnable {
+        _binding?.codeOverlay?.clear()
+        updateHint(0)
+    }
     private var bindGeneration = 0
     private var scaleDetector: ScaleGestureDetector? = null
     private var multiTouch = false
@@ -72,6 +96,7 @@ class ScanFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         cameraExecutor = Executors.newSingleThreadExecutor()
+        stillExecutor = Executors.newSingleThreadExecutor()
         if (savedInstanceState != null) {
             batchActive = savedInstanceState.getBoolean(STATE_BATCH)
             paused = savedInstanceState.getBoolean(STATE_PAUSED)
@@ -94,6 +119,8 @@ class ScanFragment : Fragment() {
         binding.btnGallery.setOnClickListener {
             (activity as? MainActivity)?.pickImage()
         }
+        binding.btnShutter.setOnClickListener { toggleFreeze() }
+        binding.codeOverlay.onItemTap = { code -> openCode(code) }
         binding.btnFlash.setOnClickListener { toggleTorch() }
         binding.btnSwitch.setOnClickListener { switchCamera() }
         binding.btnBatch.setOnClickListener {
@@ -129,6 +156,7 @@ class ScanFragment : Fragment() {
             }
         )
         binding.previewView.setOnTouchListener { v, event ->
+            if (frozen) return@setOnTouchListener true
             scaleDetector?.onTouchEvent(event)
             if (event.actionMasked == MotionEvent.ACTION_DOWN) multiTouch = false
             if (event.pointerCount > 1) multiTouch = true
@@ -144,7 +172,7 @@ class ScanFragment : Fragment() {
         super.onResume()
         (activity as? MainActivity)?.applyToolbar(null, false, 0, null)
         updateChrome()
-        if (parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) != null) {
+        if (parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) != null || frozen) {
             paused = true
         }
         if (hasCameraPermission()) {
@@ -181,6 +209,11 @@ class ScanFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        mainHandler.removeCallbacksAndMessages(null)
+        stillGeneration++
+        frozen = false
+        stillBitmap?.let { if (!it.isRecycled) it.recycle() }
+        stillBitmap = null
         scaleDetector = null
         _binding = null
         super.onDestroyView()
@@ -188,6 +221,7 @@ class ScanFragment : Fragment() {
 
     override fun onDestroy() {
         cameraExecutor.shutdown()
+        stillExecutor.shutdown()
         super.onDestroy()
     }
 
@@ -196,7 +230,7 @@ class ScanFragment : Fragment() {
     }
 
     fun onImagePickCancelled() {
-        if (parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) == null) {
+        if (!frozen && parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) == null) {
             paused = false
         }
     }
@@ -206,15 +240,185 @@ class ScanFragment : Fragment() {
     }
 
     fun resumeScanning() {
+        // A frozen frame stays paused until the person taps the close button.
+        if (frozen) return
         paused = false
         lastAt = SystemClock.elapsedRealtime()
+    }
+
+    /** Called by the activity on Back; returns true when it was used to leave the frozen frame. */
+    fun handleBack(): Boolean {
+        if (!frozen) return false
+        exitStill()
+        return true
     }
 
     private fun updateChrome() {
         val settings = store.getSettings()
         binding.btnBatch.visibility = if (settings.batchScanMode) View.VISIBLE else View.GONE
         if (!settings.batchScanMode) batchActive = false
+        batchEnabled = settings.batchScanMode
+        autoScan = settings.autoScan
+        multiScan = settings.multiScan
         tintBatch()
+        updateShutter()
+    }
+
+    // ---- freeze frame / still images (camera freeze and imported pictures) ----
+
+    private fun toggleFreeze() {
+        if (frozen) exitStill() else freezeCamera()
+    }
+
+    private fun freezeCamera() {
+        if (camera == null || !hasCameraPermission()) return
+        val shot = binding.previewView.bitmap
+        if (shot == null) {
+            Toast.makeText(requireContext(), R.string.no_camera, Toast.LENGTH_SHORT).show()
+            return
+        }
+        flashShutter()
+        beginStill(shot)
+        stillAnalyzing = true
+        updateHint(0)
+        val generation = ++stillGeneration
+        stillExecutor.execute {
+            val codes = try {
+                Decoder.decodeStill(shot)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            mainHandler.post {
+                if (_binding == null || generation != stillGeneration || !frozen) return@post
+                stillAnalyzing = false
+                applyStillCodes(codes)
+            }
+        }
+    }
+
+    /** Shows an already-decoded picture (from the gallery) with a box around every code in it. */
+    fun showStill(bitmap: Bitmap, codes: List<DetectedCode>) {
+        if (_binding == null) {
+            if (!bitmap.isRecycled) bitmap.recycle()
+            return
+        }
+        stillGeneration++
+        beginStill(bitmap)
+        stillAnalyzing = false
+        applyStillCodes(codes)
+    }
+
+    private fun beginStill(bitmap: Bitmap) {
+        val previous = stillBitmap
+        stillBitmap = bitmap
+        binding.frozenImage.setImageBitmap(bitmap)
+        binding.frozenImage.visibility = View.VISIBLE
+        frozen = true
+        paused = true
+        openedInStill.clear()
+        mainHandler.removeCallbacks(clearOverlay)
+        binding.codeOverlay.clear()
+        if (previous != null && previous !== bitmap && !previous.isRecycled) previous.recycle()
+        updateShutter()
+    }
+
+    private fun applyStillCodes(codes: List<DetectedCode>) {
+        val bitmap = stillBitmap ?: return
+        stillCount = codes.size
+        val context = requireContext()
+        val items = codes.map { code ->
+            val risky = isRisky(code.text)
+            CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
+        }
+        binding.codeOverlay.setCodes(items, bitmap.width, bitmap.height, fitCenter = true, mirrored = false)
+        updateHint(0)
+        if (codes.isEmpty()) {
+            Toast.makeText(context, R.string.no_code_found, Toast.LENGTH_SHORT).show()
+            return
+        }
+        Actions.feedback(context)
+        if (codes.size == 1 && autoScan) {
+            val only = codes[0]
+            mainHandler.postDelayed({
+                if (frozen && _binding != null &&
+                    parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) == null
+                ) {
+                    openCode(only)
+                }
+            }, 450L)
+        }
+    }
+
+    private fun exitStill() {
+        stillGeneration++
+        frozen = false
+        stillAnalyzing = false
+        stillCount = 0
+        mainHandler.removeCallbacksAndMessages(null)
+        val b = _binding ?: return
+        b.frozenImage.visibility = View.GONE
+        b.frozenImage.setImageDrawable(null)
+        stillBitmap?.let { if (!it.isRecycled) it.recycle() }
+        stillBitmap = null
+        b.codeOverlay.clear()
+        openedInStill.clear()
+        if (parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) == null) {
+            paused = false
+            lastAt = SystemClock.elapsedRealtime()
+        }
+        updateShutter()
+        updateHint(0)
+    }
+
+    private fun flashShutter() {
+        val flash = binding.shutterFlash
+        flash.animate().cancel()
+        flash.alpha = 0.75f
+        flash.visibility = View.VISIBLE
+        flash.animate().alpha(0f).setDuration(200L).withEndAction { flash.visibility = View.GONE }.start()
+    }
+
+    private fun updateShutter() {
+        val b = _binding ?: return
+        if (frozen) {
+            b.btnShutter.setImageResource(R.drawable.ic_close)
+            b.btnShutter.contentDescription = getString(R.string.cd_unfreeze)
+        } else {
+            b.btnShutter.setImageDrawable(null)
+            b.btnShutter.contentDescription = getString(R.string.cd_shutter)
+        }
+        b.zoomSeek.visibility = if (frozen) View.INVISIBLE else View.VISIBLE
+    }
+
+    private fun updateHint(liveCount: Int) {
+        val b = _binding ?: return
+        val res = when {
+            frozen && stillAnalyzing -> R.string.hint_analyzing
+            frozen && stillCount == 0 -> R.string.hint_none_found
+            frozen -> R.string.hint_tap_code
+            liveCount >= 2 || (liveCount == 1 && !autoScan) -> R.string.hint_tap_code
+            else -> R.string.hint_point
+        }
+        b.hintText.setText(res)
+    }
+
+    private fun isRisky(text: String): Boolean {
+        return Parsers.kindOf(text) == ScanKind.URL && LinkSafety.check(text).isNotEmpty()
+    }
+
+    /** Opens the result sheet for a code the person tapped. */
+    private fun openCode(code: DetectedCode) {
+        if (!isAdded) return
+        val host = activity as? MainActivity ?: return
+        Actions.feedback(requireContext())
+        if (frozen && !openedInStill.add(code.text)) {
+            host.store.findByText(code.text)?.let {
+                paused = true
+                host.showExistingRecord(it)
+                return
+            }
+        }
+        if (host.onCodeDetected(code.text, code.format, false)) paused = true
     }
 
     private fun tintBatch() {
@@ -276,6 +480,13 @@ class ScanFragment : Fragment() {
             return
         }
         currentCameraId = cameraId
+        frontFacing = try {
+            requireContext().getSystemService(CameraManager::class.java)
+                ?.getCameraCharacteristics(cameraId)
+                ?.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+        } catch (_: Exception) {
+            false
+        }
         val selector = androidx.camera.core.CameraSelector.Builder()
             .addCameraFilter { cameras ->
                 cameras.filter { info ->
@@ -292,6 +503,20 @@ class ScanFragment : Fragment() {
         val analysisBuilder = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+        // Same 4:3 aspect for both use cases so the frame the decoder sees covers exactly the field
+        // of view on screen; that is what lets the glowing boxes line up with the codes.
+        val aspect = AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_AUTO)
+        previewBuilder.setResolutionSelector(
+            ResolutionSelector.Builder().setAspectRatioStrategy(aspect).build()
+        )
+        analysisBuilder.setResolutionSelector(
+            ResolutionSelector.Builder()
+                .setAspectRatioStrategy(aspect)
+                .setResolutionStrategy(
+                    ResolutionStrategy(Size(1280, 960), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+                )
+                .build()
+        )
         applyFocus(previewBuilder, settings.useAutoFocus)
         applyFocus(analysisBuilder, settings.useAutoFocus)
         val preview = previewBuilder.build().also {
@@ -439,20 +664,58 @@ class ScanFragment : Fragment() {
 
     private fun analyze(image: ImageProxy) {
         try {
-            if (paused) return
-            val result = Decoder.decodeImageProxy(image) ?: return
-            val text = result.text?.trim().orEmpty()
-            if (text.isEmpty()) return
-            val format = result.barcodeFormat?.name ?: return
+            if (paused || frozen) return
+            val frame = Decoder.decodeLive(image, multiScan) ?: return
+            val front = frontFacing
             mainHandler.post {
                 if (!isAdded || _binding == null) return@post
-                onLiveCode(text, format)
+                onFrame(frame, front)
             }
         } catch (_: Exception) {
             // Keep the analyzer alive after a bad frame.
         } finally {
             image.close()
         }
+    }
+
+    private fun onFrame(frame: Decoder.LiveFrame, front: Boolean) {
+        if (paused || frozen) return
+        val context = requireContext()
+        val items = frame.codes.map { code ->
+            val risky = isRisky(code.text)
+            CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
+        }
+        binding.codeOverlay.setCodes(items, frame.width, frame.height, fitCenter = false, mirrored = front)
+        mainHandler.removeCallbacks(clearOverlay)
+        mainHandler.postDelayed(clearOverlay, 450L)
+
+        val now = SystemClock.elapsedRealtime()
+        if (batchEnabled && batchActive) {
+            for (code in frame.codes) {
+                val last = seen[code.text]
+                if (last != null && now - last < 1500L) continue
+                seen[code.text] = now
+                Actions.feedback(context)
+                (activity as? MainActivity)?.onCodeDetected(code.text, code.format, true)
+            }
+            updateHint(frame.codes.size)
+            return
+        }
+        val distinct = frame.codes.map { it.text }.distinct()
+        if (distinct.size == 1 && autoScan) {
+            val text = distinct[0]
+            if (text != stableText) {
+                stableText = text
+                stableSince = now
+            }
+            // Hold for a moment so the glowing box is visible before the result opens.
+            if (now - stableSince >= AUTO_OPEN_DELAY_MS) {
+                onLiveCode(text, frame.codes.first { it.text == text }.format)
+            }
+        } else {
+            stableText = null
+        }
+        updateHint(frame.codes.size)
     }
 
     private fun onLiveCode(text: String, format: String) {
@@ -462,9 +725,7 @@ class ScanFragment : Fragment() {
         lastText = text
         lastAt = now
         Actions.feedback(requireContext())
-        val settings = store.getSettings()
-        val batch = settings.batchScanMode && batchActive
-        val pause = (activity as? MainActivity)?.onCodeDetected(text, format, batch) == true
+        val pause = (activity as? MainActivity)?.onCodeDetected(text, format, false) == true
         if (pause) paused = true
     }
 
@@ -472,5 +733,6 @@ class ScanFragment : Fragment() {
         private const val STATE_BATCH = "batchActive"
         private const val STATE_PAUSED = "paused"
         private const val STATE_CAMERA = "overrideCameraId"
+        private const val AUTO_OPEN_DELAY_MS = 350L
     }
 }

@@ -98,4 +98,25 @@ class ParsersTest {
         assertEquals("https://x.com/a,b", info?.website)
         assertTrue(text.contains("N:Doe;John;;;"))
     }
+
+    @Test fun detailGivesShortLabels() {
+        assertEquals("example.com", Parsers.detail("https://www.example.com/path?q=1"))
+        assertEquals("example.com", Parsers.detail("www.example.com"))
+        assertEquals("MyNet", Parsers.detail("WIFI:T:WPA;S:MyNet;P:secret;;"))
+        assertEquals("My;Net", Parsers.detail("WIFI:T:WPA;S:My\\;Net;P:secret;;"))
+        assertEquals("John Doe", Parsers.detail("BEGIN:VCARD\nFN:John Doe\nEND:VCARD"))
+        assertEquals("Launch", Parsers.detail("BEGIN:VEVENT\nSUMMARY:Launch\nDTSTART:20261011\nEND:VEVENT"))
+        assertEquals("a@b.com", Parsers.detail("mailto:a@b.com?subject=Hi"))
+        assertEquals("555", Parsers.detail("smsto:555:hello"))
+        assertEquals("+123", Parsers.detail("tel:+123"))
+        assertEquals("1.5,2.5", Parsers.detail("geo:1.5,2.5?z=3"))
+        assertEquals("5901234123457", Parsers.detail("5901234123457"))
+    }
+
+    @Test fun detailCollapsesWhitespaceAndEllipsizes() {
+        assertEquals("hello world", Parsers.detail("  hello \n  world  "))
+        val long = Parsers.detail("x".repeat(100), 10)
+        assertEquals(10, long.length)
+        assertTrue(long.endsWith("…"))
+    }
 }

@@ -65,6 +65,7 @@ class CreateResultFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        UiUtil.constrainWidth(binding.root, 560)
         codeText = requireArguments().getString(ARG_TEXT).orEmpty()
         codeFormat = Encoder.formatOf(requireArguments().getString(ARG_FORMAT).orEmpty()) ?: BarcodeFormat.QR_CODE
         binding.codeText.text = codeText

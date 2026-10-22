@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.localscanner.qr.databinding.ItemCreateTypeBinding
 import com.localscanner.qr.databinding.ItemSectionBinding
@@ -23,8 +23,14 @@ class CreateListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.createList.layoutManager = LinearLayoutManager(requireContext())
-        binding.createList.adapter = CreateAdapter(buildRows()) { entry -> onEntry(entry) }
+        val adapter = CreateAdapter(buildRows()) { entry -> onEntry(entry) }
+        val spans = UiUtil.columns(binding.createList, 360, 3)
+        binding.createList.layoutManager = GridLayoutManager(requireContext(), spans).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int = if (adapter.isHeader(position)) spans else 1
+            }
+        }
+        binding.createList.adapter = adapter
     }
 
     override fun onResume() {
@@ -110,6 +116,8 @@ class CreateListFragment : Fragment() {
         private val onClick: (Entry) -> Unit
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         override fun getItemCount(): Int = rows.size
+
+        fun isHeader(position: Int): Boolean = rows.getOrNull(position) is CreateRow.Header
 
         override fun getItemViewType(position: Int): Int {
             return if (rows[position] is CreateRow.Header) 0 else 1

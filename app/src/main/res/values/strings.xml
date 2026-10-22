@@ -202,4 +202,15 @@
     <string name="ec_m">M</string>
     <string name="ec_q">Q</string>
     <string name="ec_h">H</string>
+
+    <string name="hint_point">Point the camera at a code</string>
+    <string name="hint_tap_code">Tap a code to open it</string>
+    <string name="hint_analyzing">Looking for codes…</string>
+    <string name="hint_none_found">No code found. Tap ✕ to go back.</string>
+    <string name="cd_shutter">Freeze frame</string>
+    <string name="cd_unfreeze">Back to live camera</string>
+    <string name="multi_scan">Scan multiple codes</string>
+    <string name="multi_scan_subtitle">Draws a glowing box around every code in view. Tap one to open it.</string>
+    <string name="auto_scan">Auto scan</string>
+    <string name="auto_scan_subtitle">Opens the result as soon as a single code is detected.</string>
 </resources>

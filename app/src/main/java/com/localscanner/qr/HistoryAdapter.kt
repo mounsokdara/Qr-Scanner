@@ -33,6 +33,8 @@ class HistoryAdapter(
 
     override fun getItemCount(): Int = rows.size
 
+    fun isHeader(position: Int): Boolean = rows.getOrNull(position) is HistoryRow.Header
+
     override fun getItemViewType(position: Int): Int {
         return if (rows[position] is HistoryRow.Header) TYPE_HEADER else TYPE_ITEM
     }

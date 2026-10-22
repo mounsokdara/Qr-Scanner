@@ -25,6 +25,7 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        UiUtil.constrainWidth(binding.root, 640)
         store = (requireActivity() as MainActivity).store
         load()
         binding.rowBatch.setOnClickListener { binding.checkBatch.toggle() }
@@ -38,6 +39,8 @@ class SettingsFragment : Fragment() {
         binding.rowAutoOpen.setOnClickListener { binding.checkAutoOpen.toggle() }
         binding.rowSound.setOnClickListener { binding.checkSound.toggle() }
         binding.rowVibrate.setOnClickListener { binding.checkVibrate.toggle() }
+        binding.rowMulti.setOnClickListener { binding.checkMulti.toggle() }
+        binding.rowAutoScan.setOnClickListener { binding.checkAutoScan.toggle() }
         binding.checkBatch.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkAutofocus.setOnCheckedChangeListener { _, _ ->
             refreshTouch()
@@ -50,6 +53,8 @@ class SettingsFragment : Fragment() {
         binding.checkAutoOpen.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkSound.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkVibrate.setOnCheckedChangeListener { _, _ -> persist() }
+        binding.checkMulti.setOnCheckedChangeListener { _, _ -> persist() }
+        binding.checkAutoScan.setOnCheckedChangeListener { _, _ -> persist() }
         binding.rowCustom.setOnClickListener { editCustomAction() }
         binding.rowCamera.setOnClickListener { pickCamera() }
         binding.rowEngine.setOnClickListener { pickEngine() }
@@ -83,6 +88,8 @@ class SettingsFragment : Fragment() {
         binding.checkAutoOpen.isChecked = settings.autoOpenUrls
         binding.checkSound.isChecked = settings.soundOnScan
         binding.checkVibrate.isChecked = settings.vibrateOnScan
+        binding.checkMulti.isChecked = settings.multiScan
+        binding.checkAutoScan.isChecked = settings.autoScan
         binding.valueCustom.text = settings.customActionUrl.ifBlank { getString(R.string.none) }
         binding.valueCamera.text = cameraLabel(settings.cameraId)
         binding.valueEngine.text = engineLabel(settings.searchEngine)
@@ -103,7 +110,9 @@ class SettingsFragment : Fragment() {
                 addScansToHistory = binding.checkAddHistory.isChecked,
                 autoOpenUrls = binding.checkAutoOpen.isChecked,
                 soundOnScan = binding.checkSound.isChecked,
-                vibrateOnScan = binding.checkVibrate.isChecked
+                vibrateOnScan = binding.checkVibrate.isChecked,
+                multiScan = binding.checkMulti.isChecked,
+                autoScan = binding.checkAutoScan.isChecked
             )
         )
     }

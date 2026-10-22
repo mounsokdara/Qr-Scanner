@@ -1,11 +1,10 @@
 name: CI
 
-# Fast verification for branches and pull requests: unit tests + debug build.
+# Fast verification for every push and pull request: unit tests + debug build.
 # Does not sign or publish anything (the release workflow handles that on main).
 on:
   pull_request:
   push:
-    branches-ignore: [main]
   workflow_dispatch:
 
 permissions:
@@ -53,7 +52,7 @@ jobs:
               t += int(r.get('tests')); f += int(r.get('failures'))
               e += int(r.get('errors')); s += int(r.get('skipped'))
           print(f"::notice title=Unit tests::{t} tests, {f} failures, {e} errors, {s} skipped")
-          assert t >= 15 and f == 0 and e == 0, "unit tests missing or failing"
+          assert t >= 25 and f == 0 and e == 0, "unit tests missing or failing"
           PY
 
       - name: Build debug APK
