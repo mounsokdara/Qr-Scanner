@@ -19,9 +19,13 @@ Minimum Android version is 8.0 (API 26). A camera is optional. **Scan image** st
 - Create the same formats, plus URL, text, contact (vCard), email, SMS, location, phone, calendar, and Wi-Fi
 - History and favorites, rename, delete with undo, CSV/TXT/PNG export and CSV import
 - My QR contact card, in-app browser, search engines, custom action URL
+- Smart actions on scan: connect to Wi-Fi (Android 11+), add contact, add calendar event, call, email, SMS, show on map
+- Link safety warnings for http links, raw IP addresses, look-alike (punycode/unicode) hosts, shorteners and `user@host` tricks. Risky links are never auto-opened
+- History search, pinch-to-zoom, beep/vibrate toggles (silent mode respected)
+- QR style options when creating codes: colour and error-correction level
 - Permissions: camera, vibrate, internet, flashlight, and photos (read images)
 
-Package id: `com.mounsokdara.qr_scanner` (namespace `com.localscanner.qr`). Version 1.0.0.
+Package id: `com.mounsokdara.qr_scanner` (namespace `com.localscanner.qr`). Version 1.1.0. See [CHANGELOG.md](CHANGELOG.md).
 
-GitHub Actions (`.github/workflows/build-apk.yml`) builds the unsigned release, then `scripts/sign-apk.sh` zip-aligns and signs it v1+v2+v3+v4. The signing key is not in this repo. Actions secrets required: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The keystore lives in the private vault.
+CI (`.github/workflows/ci.yml`) runs the unit tests and a debug build on every branch and pull request. Release builds: GitHub Actions (`.github/workflows/build-apk.yml`) builds the unsigned release, then `scripts/sign-apk.sh` zip-aligns and signs it v1+v2+v3+v4. The signing key is not in this repo. Actions secrets required: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The keystore lives in the private vault.
 

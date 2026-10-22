@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
@@ -53,6 +54,8 @@ class ScanFragment : Fragment() {
     private var lastText = ""
     private var lastAt = 0L
     private var bindGeneration = 0
+    private var scaleDetector: ScaleGestureDetector? = null
+    private var multiTouch = false
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -112,9 +115,26 @@ class ScanFragment : Fragment() {
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
         })
-        binding.previewView.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP) {
+        scaleDetector = ScaleGestureDetector(
+            requireContext(),
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    val active = camera ?: return true
+                    val state = active.cameraInfo.zoomState.value ?: return true
+                    val ratio = (state.zoomRatio * detector.scaleFactor)
+                        .coerceIn(state.minZoomRatio, state.maxZoomRatio)
+                    active.cameraControl.setZoomRatio(ratio)
+                    return true
+                }
+            }
+        )
+        binding.previewView.setOnTouchListener { v, event ->
+            scaleDetector?.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) multiTouch = false
+            if (event.pointerCount > 1) multiTouch = true
+            if (event.actionMasked == MotionEvent.ACTION_UP && !multiTouch) {
                 focusAt(event.x, event.y)
+                v.performClick()
             }
             true
         }
@@ -157,6 +177,7 @@ class ScanFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        scaleDetector = null
         _binding = null
         super.onDestroyView()
     }
@@ -281,6 +302,10 @@ class ScanFragment : Fragment() {
             torchOn = false
             binding.btnFlash.imageTintList = ColorStateList.valueOf(Color.WHITE)
             binding.zoomSeek.progress = 0
+            // Keep the slider in sync with pinch-to-zoom.
+            camera?.cameraInfo?.zoomState?.observe(viewLifecycleOwner) { state ->
+                if (_binding != null) binding.zoomSeek.progress = (state.linearZoom * 100f).toInt()
+            }
         } catch (_: Exception) {
             Toast.makeText(requireContext(), R.string.no_camera, Toast.LENGTH_SHORT).show()
         }

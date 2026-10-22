@@ -36,6 +36,8 @@ object Decoder {
         BarcodeFormat.AZTEC
     )
 
+    private var invertTick = 0
+
     fun decodeImageProxy(image: ImageProxy): Result? {
         val source = try {
             yuvToLuminance(image)
@@ -44,6 +46,9 @@ object Decoder {
         } ?: return null
         val direct = decodeFast(source)
         if (direct != null) return direct
+        // Inverted (light-on-dark) codes are rare; trying them on every frame doubles the CPU cost.
+        invertTick = (invertTick + 1) % 3
+        if (invertTick != 0) return null
         return try {
             decodeFast(source.invert())
         } catch (_: Exception) {

@@ -171,4 +171,35 @@
     <string name="hint_pdf417_field">PDF417</string>
     <string name="hint_aztec_field">Aztec</string>
     <string name="country_name">%1$s (%2$s)</string>
+
+    <string name="connect">Connect</string>
+    <string name="add_contact">Add contact</string>
+    <string name="add_event">Add event</string>
+    <string name="send_email">Send email</string>
+    <string name="send_sms">Send SMS</string>
+    <string name="call">Call</string>
+    <string name="show_map">Show map</string>
+    <string name="format_and_kind">%1$s · %2$s</string>
+    <string name="risk_header">Check this link before opening it:</string>
+    <string name="risk_insecure">It uses plain http, so the connection is not encrypted.</string>
+    <string name="risk_ip_host">It points to a raw IP address instead of a website name.</string>
+    <string name="risk_punycode">The address uses an encoded international name that can imitate a real site.</string>
+    <string name="risk_non_ascii">The address contains look-alike non-English characters.</string>
+    <string name="risk_shortener">It is a shortened link, so the real destination is hidden.</string>
+    <string name="risk_credentials">The text before the @ sign is not the real site. The part after it is.</string>
+    <string name="sound_on_scan">Beep on scan</string>
+    <string name="sound_on_scan_subtitle">Stays silent when the phone is on silent or vibrate.</string>
+    <string name="vibrate_on_scan">Vibrate on scan</string>
+    <string name="search_history">Search history</string>
+    <string name="no_results">No matches</string>
+    <string name="reload">Reload</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="copy_link">Copy link</string>
+    <string name="not_secure">Not secure</string>
+    <string name="qr_color">Color</string>
+    <string name="error_correction">Error correction</string>
+    <string name="ec_l">L</string>
+    <string name="ec_m">M</string>
+    <string name="ec_q">Q</string>
+    <string name="ec_h">H</string>
 </resources>

@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SearchView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -36,6 +37,7 @@ class HistoryFragment : Fragment() {
     private lateinit var adapter: HistoryAdapter
     private var pendingPath: String? = null
     private var pendingKind: String? = null
+    private var query = ""
 
     private val exportTxt = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         uri?.let { writeStaged(it) }
@@ -55,6 +57,7 @@ class HistoryFragment : Fragment() {
         favoritesOnly = arguments?.getBoolean(ARG_FAVORITES) == true
         pendingPath = savedInstanceState?.getString(STATE_PATH)
         pendingKind = savedInstanceState?.getString(STATE_KIND)
+        query = savedInstanceState?.getString(STATE_QUERY).orEmpty()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -95,14 +98,46 @@ class HistoryFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         val title = if (favoritesOnly) getString(R.string.favorites) else getString(R.string.history)
-        (activity as? MainActivity)?.applyToolbar(title, false, R.menu.menu_history, ::onToolbar)
+        val main = activity as? MainActivity
+        main?.applyToolbar(title, false, R.menu.menu_history, ::onToolbar)
+        setupSearch(main)
         reload()
+    }
+
+    private fun setupSearch(main: MainActivity?) {
+        val item = main?.toolbarMenu()?.findItem(R.id.action_search) ?: return
+        val searchView = item.actionView as? SearchView ?: return
+        searchView.queryHint = getString(R.string.search_history)
+        searchView.maxWidth = Int.MAX_VALUE
+        if (query.isNotEmpty()) {
+            item.expandActionView()
+            searchView.setQuery(query, false)
+        }
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(text: String?): Boolean = false
+
+            override fun onQueryTextChange(text: String?): Boolean {
+                query = text.orEmpty().trim()
+                reload()
+                return true
+            }
+        })
+        item.setOnActionExpandListener(object : android.view.MenuItem.OnActionExpandListener {
+            override fun onMenuItemActionExpand(item: MenuItem): Boolean = true
+
+            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                query = ""
+                reload()
+                return true
+            }
+        })
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_PATH, pendingPath)
         outState.putString(STATE_KIND, pendingKind)
+        outState.putString(STATE_QUERY, query)
     }
 
     private fun onToolbar(item: MenuItem): Boolean {
@@ -192,7 +227,22 @@ class HistoryFragment : Fragment() {
 
     private fun reload() {
         if (!::adapter.isInitialized) return
-        val records = currentRecords().sortedByDescending { it.timestamp }
+        val needle = query.lowercase(Locale.getDefault())
+        val records = currentRecords()
+            .filter { record ->
+                needle.isEmpty() ||
+                    record.title.lowercase(Locale.getDefault()).contains(needle) ||
+                    record.text.lowercase(Locale.getDefault()).contains(needle) ||
+                    Payloads.formatLabel(record.format).lowercase(Locale.getDefault()).contains(needle)
+            }
+            .sortedByDescending { it.timestamp }
+        emptySubtitle.setText(
+            when {
+                query.isNotEmpty() -> R.string.no_results
+                favoritesOnly -> R.string.no_favorites_yet
+                else -> R.string.no_history_yet
+            }
+        )
         emptyView.visibility = if (records.isEmpty()) View.VISIBLE else View.GONE
         list.visibility = if (records.isEmpty()) View.GONE else View.VISIBLE
         adapter.submit(group(records))
@@ -291,6 +341,7 @@ class HistoryFragment : Fragment() {
         private const val ARG_FAVORITES = "favorites"
         private const val STATE_PATH = "pendingPath"
         private const val STATE_KIND = "pendingKind"
+        private const val STATE_QUERY = "query"
 
         fun newHistory(): HistoryFragment = HistoryFragment().apply {
             arguments = Bundle().apply { putBoolean(ARG_FAVORITES, false) }

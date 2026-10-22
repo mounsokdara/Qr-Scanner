@@ -12,9 +12,9 @@ object Transfer {
             builder.append(csvEscape(record.id)).append(',')
             builder.append(record.timestamp).append(',')
             builder.append(csvEscape(record.format)).append(',')
-            builder.append(csvEscape(record.title)).append(',')
+            builder.append(csvEscape(csvSafe(record.title))).append(',')
             builder.append(if (record.favorite) "1" else "0").append(',')
-            builder.append(csvEscape(record.text)).append('\n')
+            builder.append(csvEscape(csvSafe(record.text))).append('\n')
         }
         return builder.toString()
     }
@@ -49,11 +49,11 @@ object Transfer {
                     val at = header.indexOf(name)
                     return if (at in cols.indices) cols[at] else ""
                 }
-                val body = col("text").ifBlank { cols.lastOrNull().orEmpty() }
+                val body = csvUnsafe(col("text").ifBlank { cols.lastOrNull().orEmpty() })
                 if (body.isBlank()) continue
                 val format = col("format").ifBlank { "QR_CODE" }
                 val timestamp = col("timestamp").toLongOrNull() ?: System.currentTimeMillis()
-                val title = col("title").ifBlank { Payloads.defaultTitle(body, format) }
+                val title = csvUnsafe(col("title")).ifBlank { Payloads.defaultTitle(body, format) }
                 val favorite = col("favorite").equals("1", true) || col("favorite").equals("true", true)
                 records.add(
                     ScanRecord(
@@ -141,6 +141,18 @@ object Transfer {
             }
         }
         return rows
+    }
+
+    private const val FORMULA_CHARS = "=+-@\t\r"
+
+    /** Spreadsheet apps run cells starting with these characters as formulas, so prefix them with a quote. */
+    private fun csvSafe(value: String): String {
+        return if (value.isNotEmpty() && value[0] in FORMULA_CHARS) "'$value" else value
+    }
+
+    /** Reverses [csvSafe] when importing a file this app exported. */
+    private fun csvUnsafe(value: String): String {
+        return if (value.length > 1 && value[0] == '\'' && value[1] in FORMULA_CHARS) value.substring(1) else value
     }
 
     private fun csvEscape(value: String): String {

@@ -1,32 +1,63 @@
 package com.localscanner.qr
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.zxing.BarcodeFormat
 import com.localscanner.qr.databinding.LayoutResultSheetBinding
 
 class ResultBottomSheet : BottomSheetDialogFragment() {
+    private var pendingExport: Pair<String, String>? = null
+
+    private val writePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val pending = pendingExport
+        pendingExport = null
+        if (pending == null || !isAdded) return@registerForActivityResult
+        if (granted) {
+            exportPng(pending.first, pending.second)
+        } else {
+            Toast.makeText(requireContext(), R.string.could_not_write, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun getTheme(): Int = R.style.Theme_QrScanner_BottomSheet
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val binding = LayoutResultSheetBinding.inflate(inflater, container, false)
         val text = requireArguments().getString(ARG_TEXT).orEmpty()
         val formatName = requireArguments().getString(ARG_FORMAT).orEmpty()
-        binding.sheetFormat.text = Payloads.formatLabel(formatName)
+        val kind = Parsers.kindOf(text)
+        val kindLabel = kindLabel(kind)
+        binding.sheetFormat.text = if (kindLabel == null) {
+            Payloads.formatLabel(formatName)
+        } else {
+            getString(R.string.format_and_kind, Payloads.formatLabel(formatName), kindLabel)
+        }
         binding.sheetText.text = text
         binding.sheetText.setTextIsSelectable(true)
         val store = Store(requireContext())
         val settings = store.getSettings()
-        val open = Payloads.actionLabelIsOpen(text)
-        binding.btnOpen.setText(if (open) R.string.open else R.string.search)
-        binding.btnOpen.setIconResource(if (open) R.drawable.ic_open else R.drawable.ic_search)
+        val risks = if (kind == ScanKind.URL) LinkSafety.check(text) else emptySet()
+        if (risks.isEmpty()) {
+            binding.sheetWarning.visibility = View.GONE
+        } else {
+            binding.sheetWarning.visibility = View.VISIBLE
+            binding.sheetWarning.text = riskText(risks)
+        }
+        val (actionLabel, actionIcon) = actionFor(kind, Payloads.actionLabelIsOpen(text))
+        binding.btnOpen.setText(actionLabel)
+        binding.btnOpen.setIconResource(actionIcon)
         binding.btnCopy.setOnClickListener { Actions.copy(requireContext(), text) }
         binding.btnShare.setOnClickListener { Actions.shareText(requireActivity(), text) }
         binding.btnOpen.setOnClickListener {
@@ -64,7 +95,57 @@ class ResultBottomSheet : BottomSheetDialogFragment() {
         (activity as? MainActivity)?.onResultSheetDismissed()
     }
 
+    private fun kindLabel(kind: ScanKind): String? {
+        return when (kind) {
+            ScanKind.URL -> getString(R.string.type_url)
+            ScanKind.WIFI -> getString(R.string.type_wifi)
+            ScanKind.CONTACT -> getString(R.string.type_contact)
+            ScanKind.EVENT -> getString(R.string.type_calendar)
+            ScanKind.EMAIL -> getString(R.string.type_email)
+            ScanKind.SMS -> getString(R.string.type_sms)
+            ScanKind.PHONE -> getString(R.string.type_phone)
+            ScanKind.GEO -> getString(R.string.type_geo)
+            ScanKind.TEXT -> null
+        }
+    }
+
+    private fun actionFor(kind: ScanKind, opens: Boolean): Pair<Int, Int> {
+        return when (kind) {
+            ScanKind.WIFI -> R.string.connect to R.drawable.ic_wifi
+            ScanKind.CONTACT -> R.string.add_contact to R.drawable.ic_person
+            ScanKind.EVENT -> R.string.add_event to R.drawable.ic_event
+            ScanKind.EMAIL -> R.string.send_email to R.drawable.ic_email
+            ScanKind.SMS -> R.string.send_sms to R.drawable.ic_sms
+            ScanKind.PHONE -> R.string.call to R.drawable.ic_phone
+            ScanKind.GEO -> R.string.show_map to R.drawable.ic_place
+            else -> if (opens) R.string.open to R.drawable.ic_open else R.string.search to R.drawable.ic_search
+        }
+    }
+
+    private fun riskText(risks: Set<LinkRisk>): String {
+        val lines = risks.map { risk ->
+            val res = when (risk) {
+                LinkRisk.INSECURE -> R.string.risk_insecure
+                LinkRisk.IP_HOST -> R.string.risk_ip_host
+                LinkRisk.PUNYCODE -> R.string.risk_punycode
+                LinkRisk.NON_ASCII_HOST -> R.string.risk_non_ascii
+                LinkRisk.SHORTENER -> R.string.risk_shortener
+                LinkRisk.CREDENTIALS -> R.string.risk_credentials
+            }
+            "• " + getString(res)
+        }
+        return getString(R.string.risk_header) + "\n" + lines.joinToString("\n")
+    }
+
     private fun exportPng(text: String, formatName: String) {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingExport = text to formatName
+            writePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
         val format = Encoder.formatOf(formatName) ?: BarcodeFormat.QR_CODE
         val bitmap = Encoder.encode(text, format) ?: Encoder.encode(text, BarcodeFormat.QR_CODE)
         if (bitmap == null) {

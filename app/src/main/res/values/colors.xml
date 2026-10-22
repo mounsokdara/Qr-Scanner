@@ -15,4 +15,6 @@
     <color name="headerSub">#E3F2FD</color>
     <color name="divider">#33FFFFFF</color>
     <color name="navChecked">#332196F3</color>
+    <color name="warning">#FFC107</color>
+    <color name="warningBg">#26FFC107</color>
 </resources>

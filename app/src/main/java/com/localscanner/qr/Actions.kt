@@ -12,6 +12,7 @@ import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.net.Uri
+import android.net.wifi.WifiNetworkSuggestion
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
@@ -19,7 +20,10 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.CalendarContract
+import android.provider.ContactsContract
 import android.provider.MediaStore
+import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -28,34 +32,48 @@ import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
+import java.util.Locale
 
 object Actions {
     fun feedback(context: Context) {
-        try {
-            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
-            Handler(Looper.getMainLooper()).postDelayed({
-                try {
-                    tone.release()
-                } catch (_: Exception) {
-                    // Already released.
-                }
-            }, 250)
+        val settings = try {
+            Store(context).getSettings()
         } catch (_: Exception) {
-            // Beep is optional.
+            AppSettings()
         }
-        try {
-            val effect = VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val manager = context.getSystemService(VibratorManager::class.java)
-                manager?.defaultVibrator?.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                vibrator.vibrate(effect)
+        if (settings.soundOnScan) {
+            try {
+                val audio = context.getSystemService(AudioManager::class.java)
+                // Stay quiet in silent / vibrate-only ringer modes.
+                if (audio == null || audio.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+                    val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
+                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        try {
+                            tone.release()
+                        } catch (_: Exception) {
+                            // Already released.
+                        }
+                    }, 250)
+                }
+            } catch (_: Exception) {
+                // Beep is optional.
             }
-        } catch (_: Exception) {
-            // Vibration is optional.
+        }
+        if (settings.vibrateOnScan) {
+            try {
+                val effect = VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val manager = context.getSystemService(VibratorManager::class.java)
+                    manager?.defaultVibrator?.vibrate(effect)
+                } else {
+                    @Suppress("DEPRECATION")
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    vibrator.vibrate(effect)
+                }
+            } catch (_: Exception) {
+                // Vibration is optional.
+            }
         }
     }
 
@@ -133,9 +151,20 @@ object Actions {
 
     fun openContent(context: Context, text: String, settings: AppSettings) {
         val trimmed = text.trim()
-        if (trimmed.startsWith("WIFI:", ignoreCase = true)) {
-            showWifi(context, trimmed)
-            return
+        when (Parsers.kindOf(trimmed)) {
+            ScanKind.WIFI -> {
+                showWifi(context, trimmed)
+                return
+            }
+            ScanKind.CONTACT -> {
+                addContact(context, trimmed)
+                return
+            }
+            ScanKind.EVENT -> {
+                addEvent(context, trimmed)
+                return
+            }
+            else -> Unit
         }
         val normalized = if (trimmed.startsWith("www.", ignoreCase = true)) "https://$trimmed" else trimmed
         if (Payloads.isHttpUrl(normalized)) {
@@ -205,14 +234,99 @@ object Actions {
         }
         val password = info.password.ifEmpty { "—" }
         val type = info.type.ifEmpty { "nopass" }
-        MaterialAlertDialogBuilder(context)
+        val canConnect = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            info.ssid.isNotBlank() &&
+            !type.equals("WEP", ignoreCase = true)
+        val builder = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.wifi_title)
             .setMessage(context.getString(R.string.wifi_body, info.ssid, password, type))
-            .setPositiveButton(R.string.ok, null)
             .setNeutralButton(R.string.copy_password) { _, _ ->
                 if (info.password.isNotEmpty()) copy(context, info.password)
             }
-            .show()
+        if (canConnect) {
+            builder.setPositiveButton(R.string.connect) { _, _ -> connectWifi(context, info) }
+            builder.setNegativeButton(R.string.close, null)
+        } else {
+            builder.setPositiveButton(R.string.ok, null)
+        }
+        builder.show()
+    }
+
+    private fun connectWifi(context: Context, info: WifiInfo) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        try {
+            val suggestion = WifiNetworkSuggestion.Builder()
+                .setSsid(info.ssid)
+                .setIsHiddenSsid(info.hidden)
+            val type = info.type.uppercase(Locale.US)
+            if (info.password.isNotEmpty() && type != "NOPASS") {
+                if (type == "SAE") {
+                    suggestion.setWpa3Passphrase(info.password)
+                } else {
+                    suggestion.setWpa2Passphrase(info.password)
+                }
+            }
+            val intent = Intent(Settings.ACTION_WIFI_ADD_NETWORKS).apply {
+                putParcelableArrayListExtra(
+                    Settings.EXTRA_WIFI_NETWORK_LIST,
+                    arrayListOf(suggestion.build())
+                )
+            }
+            launch(context, intent)
+        } catch (_: Exception) {
+            try {
+                launch(context, Intent(Settings.ACTION_WIFI_SETTINGS))
+            } catch (_: Exception) {
+                Toast.makeText(context, R.string.nothing_to_open, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun addContact(context: Context, text: String) {
+        val info = Parsers.parseVCard(text)
+        if (info == null) {
+            copy(context, text)
+            return
+        }
+        val notes = listOf(info.note, info.website).filter { it.isNotBlank() }.joinToString("\n")
+        val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+            type = ContactsContract.RawContacts.CONTENT_TYPE
+            if (info.name.isNotBlank()) putExtra(ContactsContract.Intents.Insert.NAME, info.name)
+            if (info.organization.isNotBlank()) putExtra(ContactsContract.Intents.Insert.COMPANY, info.organization)
+            info.phones.getOrNull(0)?.let { putExtra(ContactsContract.Intents.Insert.PHONE, it) }
+            info.phones.getOrNull(1)?.let { putExtra(ContactsContract.Intents.Insert.SECONDARY_PHONE, it) }
+            info.emails.getOrNull(0)?.let { putExtra(ContactsContract.Intents.Insert.EMAIL, it) }
+            info.emails.getOrNull(1)?.let { putExtra(ContactsContract.Intents.Insert.SECONDARY_EMAIL, it) }
+            if (info.address.isNotBlank()) putExtra(ContactsContract.Intents.Insert.POSTAL, info.address)
+            if (notes.isNotBlank()) putExtra(ContactsContract.Intents.Insert.NOTES, notes)
+        }
+        try {
+            launch(context, intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, R.string.nothing_to_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun addEvent(context: Context, text: String) {
+        val info = Parsers.parseVEvent(text)
+        if (info == null) {
+            copy(context, text)
+            return
+        }
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            data = CalendarContract.Events.CONTENT_URI
+            if (info.title.isNotBlank()) putExtra(CalendarContract.Events.TITLE, info.title)
+            if (info.location.isNotBlank()) putExtra(CalendarContract.Events.EVENT_LOCATION, info.location)
+            if (info.description.isNotBlank()) putExtra(CalendarContract.Events.DESCRIPTION, info.description)
+            info.startMillis?.let { putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, it) }
+            info.endMillis?.let { putExtra(CalendarContract.EXTRA_EVENT_END_TIME, it) }
+            if (info.allDay) putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, true)
+        }
+        try {
+            launch(context, intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, R.string.nothing_to_open, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun launch(context: Context, intent: Intent) {
