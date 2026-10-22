@@ -25,7 +25,7 @@ Minimum Android version is 8.0 (API 26). A camera is optional. **Scan image** st
 - QR style options when creating codes: colour and error-correction level
 - Permissions: camera, vibrate, internet, flashlight, and photos (read images)
 
-Package id: `com.mounsokdara.qr_scanner` (namespace `com.localscanner.qr`). Version 1.1.0. See [CHANGELOG.md](CHANGELOG.md).
+Package id: `com.mounsokdara.qr_scanner` (namespace `com.localscanner.qr`). Version 1.0.0 (in development). See [CHANGELOG.md](CHANGELOG.md).
 
 CI (`.github/workflows/ci.yml`) runs the unit tests and a debug build on every branch and pull request. Release builds: GitHub Actions (`.github/workflows/build-apk.yml`) builds the unsigned release, then `scripts/sign-apk.sh` zip-aligns and signs it v1+v2+v3+v4. The signing key is not in this repo. Actions secrets required: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The keystore lives in the private vault.
 
