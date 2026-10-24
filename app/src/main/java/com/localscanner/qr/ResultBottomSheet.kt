@@ -54,7 +54,7 @@ class ResultBottomSheet : BottomSheetDialogFragment() {
         binding.sheetText.setTextIsSelectable(true)
         val store = Store(requireContext())
         val settings = store.getSettings()
-        val risks = if (kind == ScanKind.URL) LinkSafety.check(text) else emptySet()
+        val risks = if (kind == ScanKind.URL && settings.linkWarnings) LinkSafety.check(text) else emptySet()
         if (risks.isEmpty()) {
             binding.sheetWarning.visibility = View.GONE
         } else {

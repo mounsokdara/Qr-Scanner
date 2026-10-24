@@ -48,6 +48,28 @@ class CodeOverlayView @JvmOverloads constructor(
 
     var onItemTap: ((DetectedCode) -> Unit)? = null
 
+    /** Receives every touch event the overlay consumes, so the host can zoom and pan a still picture. */
+    var gestureForwarder: ((MotionEvent) -> Unit)? = null
+
+    var showBoxes = true
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var showLabels = true
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private var zoomScale = 1f
+    private var zoomTx = 0f
+    private var zoomTy = 0f
+    private var downX = 0f
+    private var downY = 0f
+    private var tapCancelled = false
+    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+
     private var items: List<Item> = emptyList()
     private var srcW = 0
     private var srcH = 0
@@ -98,6 +120,15 @@ class CodeOverlayView @JvmOverloads constructor(
         mirror = mirrored
         rebuild()
         updateAnimator()
+        invalidate()
+    }
+
+    /** Zoom/pan applied around the view centre, matching a scaled and translated ImageView underneath. */
+    fun setTransform(scale: Float, tx: Float, ty: Float) {
+        zoomScale = scale
+        zoomTx = tx
+        zoomTy = ty
+        rebuild()
         invalidate()
     }
 
@@ -160,7 +191,14 @@ class CodeOverlayView @JvmOverloads constructor(
             val corners = CodeGeometry.corners(item.code.format, item.code.points)
             if (corners.size < 4) continue
             val quad = corners.map {
-                CodeGeometry.mapPoint(it, srcW.toFloat(), srcH.toFloat(), vw, vh, fit, mirror)
+                val p = CodeGeometry.mapPoint(it, srcW.toFloat(), srcH.toFloat(), vw, vh, fit, mirror)
+                Pt((p.x - vw / 2f) * zoomScale + vw / 2f + zoomTx, (p.y - vh / 2f) * zoomScale + vh / 2f + zoomTy)
+            }
+            // Skip codes that have been zoomed or panned completely out of view.
+            if (quad.maxOf { it.x } < 0f || quad.minOf { it.x } > vw ||
+                quad.maxOf { it.y } < 0f || quad.minOf { it.y } > vh
+            ) {
+                continue
             }
             val path = Path().apply {
                 moveTo(quad[0].x, quad[0].y)
@@ -203,33 +241,37 @@ class CodeOverlayView @JvmOverloads constructor(
         for (d in list) {
             matrix.setRotate(phase * 360f, d.cx, d.cy)
             d.shader.setLocalMatrix(matrix)
-            strokePaint.shader = d.shader
-            for (i in GLOW_WIDTHS.indices) {
-                strokePaint.strokeWidth = GLOW_WIDTHS[i] * density
-                strokePaint.alpha = (GLOW_ALPHA[i] * pulse * 255f).toInt().coerceIn(0, 255)
+            if (showBoxes) {
+                strokePaint.shader = d.shader
+                for (i in GLOW_WIDTHS.indices) {
+                    strokePaint.strokeWidth = GLOW_WIDTHS[i] * density
+                    strokePaint.alpha = (GLOW_ALPHA[i] * pulse * 255f).toInt().coerceIn(0, 255)
+                    canvas.drawPath(d.path, strokePaint)
+                }
+                strokePaint.strokeWidth = 3f * density
+                strokePaint.alpha = 255
                 canvas.drawPath(d.path, strokePaint)
+                fillPaint.shader = d.shader
+                fillPaint.alpha = 30
+                canvas.drawPath(d.path, fillPaint)
             }
-            strokePaint.strokeWidth = 3f * density
-            strokePaint.alpha = 255
-            canvas.drawPath(d.path, strokePaint)
-            fillPaint.shader = d.shader
-            fillPaint.alpha = 30
-            canvas.drawPath(d.path, fillPaint)
-
-            val r = d.chip.height() / 2f
-            canvas.drawRoundRect(d.chip, r, r, chipFill)
-            chipStroke.shader = d.shader
-            canvas.drawRoundRect(d.chip, r, r, chipStroke)
-            val baseline = d.chip.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
-            canvas.drawText(d.chipText, d.chip.left + 12f * density, baseline, textPaint)
+            if (showLabels) {
+                val r = d.chip.height() / 2f
+                canvas.drawRoundRect(d.chip, r, r, chipFill)
+                chipStroke.shader = d.shader
+                canvas.drawRoundRect(d.chip, r, r, chipStroke)
+                val baseline = d.chip.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
+                canvas.drawText(d.chipText, d.chip.left + 12f * density, baseline, textPaint)
+            }
         }
     }
 
     private fun hit(x: Float, y: Float): Drawn? {
+        if (!showBoxes && !showLabels) return null
         for (d in drawn.asReversed()) {
-            if (d.chip.contains(x, y) ||
-                CodeGeometry.contains(d.quad, x, y) ||
-                hypot(x - d.cx, y - d.cy) < 28f * density
+            if (showLabels && d.chip.contains(x, y)) return d
+            if (showBoxes &&
+                (CodeGeometry.contains(d.quad, x, y) || hypot(x - d.cx, y - d.cy) < 28f * density)
             ) {
                 return d
             }
@@ -241,19 +283,39 @@ class CodeOverlayView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downTarget = hit(event.x, event.y)
+                if (downTarget == null) return false
+                downX = event.x
+                downY = event.y
+                tapCancelled = false
+                gestureForwarder?.invoke(event)
+                return true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                tapCancelled = true
+                gestureForwarder?.invoke(event)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (hypot(event.x - downX, event.y - downY) > touchSlop) tapCancelled = true
+                gestureForwarder?.invoke(event)
                 return downTarget != null
             }
             MotionEvent.ACTION_UP -> {
                 val target = downTarget
                 downTarget = null
-                if (target != null && hit(event.x, event.y) === target) {
+                gestureForwarder?.invoke(event)
+                if (target != null && !tapCancelled && hit(event.x, event.y) === target) {
                     performClick()
                     onItemTap?.invoke(target.item.code)
                     return true
                 }
                 return false
             }
-            MotionEvent.ACTION_CANCEL -> downTarget = null
+            MotionEvent.ACTION_CANCEL -> {
+                downTarget = null
+                gestureForwarder?.invoke(event)
+            }
+            else -> gestureForwarder?.invoke(event)
         }
         return downTarget != null
     }

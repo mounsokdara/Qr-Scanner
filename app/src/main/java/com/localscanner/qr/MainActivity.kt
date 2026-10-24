@@ -135,7 +135,9 @@ class MainActivity : AppCompatActivity() {
             return false
         }
         // Never auto-open links that look suspicious; the result sheet shows why instead.
-        if (settings.autoOpenUrls && Payloads.isHttpUrl(text.trim()) && LinkSafety.check(text).isEmpty()) {
+        if (settings.autoOpenUrls && Payloads.isHttpUrl(text.trim()) &&
+            (!settings.linkWarnings || LinkSafety.check(text).isEmpty())
+        ) {
             Actions.openContent(this, text, settings)
         }
         return showResultSheet(text, format, outcome?.record?.id)

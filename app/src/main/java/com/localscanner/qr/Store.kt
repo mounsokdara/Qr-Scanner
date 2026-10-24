@@ -223,7 +223,12 @@ class Store(context: Context) {
                 soundOnScan = bool(obj, "soundOnScan", true),
                 vibrateOnScan = bool(obj, "vibrateOnScan", true),
                 multiScan = bool(obj, "multiScan", true),
-                autoScan = bool(obj, "autoScan", true)
+                autoScan = bool(obj, "autoScan", true),
+                showBoxes = bool(obj, "showBoxes", true),
+                showLabels = bool(obj, "showLabels", true),
+                freezeButton = bool(obj, "freezeButton", true),
+                linkWarnings = bool(obj, "linkWarnings", true),
+                pinchZoom = bool(obj, "pinchZoom", true)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -247,6 +252,11 @@ class Store(context: Context) {
             .put("vibrateOnScan", settings.vibrateOnScan)
             .put("multiScan", settings.multiScan)
             .put("autoScan", settings.autoScan)
+            .put("showBoxes", settings.showBoxes)
+            .put("showLabels", settings.showLabels)
+            .put("freezeButton", settings.freezeButton)
+            .put("linkWarnings", settings.linkWarnings)
+            .put("pinchZoom", settings.pinchZoom)
     }
 
     private fun readMyQr(): MyQrProfile {

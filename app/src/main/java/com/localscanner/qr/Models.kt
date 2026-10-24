@@ -24,7 +24,12 @@ data class AppSettings(
     val soundOnScan: Boolean = true,
     val vibrateOnScan: Boolean = true,
     val multiScan: Boolean = true,
-    val autoScan: Boolean = true
+    val autoScan: Boolean = true,
+    val showBoxes: Boolean = true,
+    val showLabels: Boolean = true,
+    val freezeButton: Boolean = true,
+    val linkWarnings: Boolean = true,
+    val pinchZoom: Boolean = true
 )
 
 data class MyQrProfile(

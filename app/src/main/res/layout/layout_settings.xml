@@ -346,6 +346,156 @@
             android:background="@color/divider" />
 
         <LinearLayout
+            android:id="@+id/rowShowBoxes"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/show_boxes" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/show_boxes_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkShowBoxes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowShowLabels"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/show_labels" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/show_labels_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkShowLabels"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowFreezeButton"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/freeze_button" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/freeze_button_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkFreezeButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowLinkWarnings"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/link_warnings" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/link_warnings_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkLinkWarnings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:id="@+id/rowPinchZoom"
+            style="@style/SettingsRow">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    style="@style/SettingsTitle"
+                    android:text="@string/pinch_zoom" />
+                <TextView
+                    style="@style/SettingsSub"
+                    android:text="@string/pinch_zoom_subtitle" />
+            </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/checkPinchZoom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clickable="false"
+                android:focusable="false" />
+        </LinearLayout>
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
             android:id="@+id/rowCamera"
             style="@style/SettingsRow">
 

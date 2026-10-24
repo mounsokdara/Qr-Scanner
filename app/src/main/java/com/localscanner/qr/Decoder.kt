@@ -40,6 +40,8 @@ object Decoder {
 
     private var invertTick = 0
 
+    @Volatile private var latestFrame: LuminanceSource? = null
+
     /** Codes found in one camera frame, in the upright (rotated) coordinate space of that frame. */
     class LiveFrame(val codes: List<DetectedCode>, val width: Int, val height: Int)
 
@@ -53,6 +55,7 @@ object Decoder {
         } catch (_: Exception) {
             null
         } ?: return null
+        latestFrame = source
         var codes = decodeLiveSource(source, multi)
         if (codes.isEmpty()) {
             // Inverted (light-on-dark) codes are rare; trying them on every frame doubles the CPU cost.
@@ -79,6 +82,17 @@ object Decoder {
         return listOfNotNull(toCode(single))
     }
 
+    /** Thorough decode of the newest camera frame (sharper than the on-screen preview bitmap). */
+    fun decodeLatestFrame(): LiveFrame? {
+        val source = latestFrame ?: return null
+        val codes = decodeStillSource(source)
+        return if (codes.isEmpty()) null else LiveFrame(codes, source.width, source.height)
+    }
+
+    fun clearLatestFrame() {
+        latestFrame = null
+    }
+
     /**
      * Thorough decode of a still image (frozen camera frame or imported picture). Finds every
      * code, of every supported format, trying both polarities and two binarizers.
@@ -89,6 +103,10 @@ object Decoder {
         } catch (_: Exception) {
             null
         } ?: return emptyList()
+        return decodeStillSource(source)
+    }
+
+    private fun decodeStillSource(source: LuminanceSource): List<DetectedCode> {
         val variants = ArrayList<LuminanceSource>(2)
         variants.add(source)
         try {
@@ -180,51 +198,29 @@ object Decoder {
         buffer.get(bytes)
         val rowStride = plane.rowStride
         val pixelStride = plane.pixelStride
-        val rotation = image.imageInfo.rotationDegrees
-        if (pixelStride == 1 && rowStride >= width && bytes.size >= (height - 1) * rowStride + width) {
-            try {
-                val source = PlanarYUVLuminanceSource(
-                    bytes,
-                    rowStride,
-                    height,
-                    0,
-                    0,
-                    width,
-                    height,
-                    false
-                )
-                return rotateClockwise(source, rotation)
-            } catch (_: Exception) {
-                // Fall through and pack the plane tightly.
-            }
-        }
         val packed = ByteArray(width * height)
-        var out = 0
-        for (row in 0 until height) {
-            var input = row * rowStride
-            for (col in 0 until width) {
-                if (input < 0 || input >= bytes.size) {
-                    packed[out++] = 0
-                } else {
-                    packed[out++] = bytes[input]
+        if (pixelStride == 1) {
+            for (row in 0 until height) {
+                val start = row * rowStride
+                if (start + width > bytes.size) break
+                System.arraycopy(bytes, start, packed, row * width, width)
+            }
+        } else {
+            var out = 0
+            for (row in 0 until height) {
+                var input = row * rowStride
+                for (col in 0 until width) {
+                    packed[out++] = if (input in bytes.indices) bytes[input] else 0
+                    input += pixelStride
                 }
-                input += pixelStride
             }
         }
-        val source = PlanarYUVLuminanceSource(packed, width, height, 0, 0, width, height, false)
-        return rotateClockwise(source, rotation)
-    }
-
-    private fun rotateClockwise(source: LuminanceSource, degrees: Int): LuminanceSource {
-        if (!source.isRotateSupported) return source
-        return when (((degrees % 360) + 360) % 360) {
-            90 -> source.rotateCounterClockwise()
-                .rotateCounterClockwise()
-                .rotateCounterClockwise()
-            180 -> source.rotateCounterClockwise().rotateCounterClockwise()
-            270 -> source.rotateCounterClockwise()
-            else -> source
-        }
+        // ZXing's PlanarYUVLuminanceSource cannot rotate itself, so turn the frame upright here.
+        // Everything downstream (result points, overlay mapping, vertical barcodes) relies on it.
+        val upright = LumaRotation.rotateClockwise(packed, width, height, image.imageInfo.rotationDegrees)
+        return PlanarYUVLuminanceSource(
+            upright.data, upright.width, upright.height, 0, 0, upright.width, upright.height, false
+        )
     }
 
     private fun decodeSampled(context: Context, uri: Uri): Bitmap? {

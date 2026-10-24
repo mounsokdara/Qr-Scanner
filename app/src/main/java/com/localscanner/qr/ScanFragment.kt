@@ -17,6 +17,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Size
 import android.view.LayoutInflater
+import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -61,6 +62,19 @@ class ScanFragment : Fragment() {
     @Volatile private var multiScan = true
     @Volatile private var frontFacing = false
     private var autoScan = true
+    private var pinchZoom = true
+    private var linkWarnings = true
+    private var freezeEnabled = true
+    private var stillScale = 1f
+    private var stillTx = 0f
+    private var stillTy = 0f
+    private var stillPanning = false
+    private var stillLastX = 0f
+    private var stillLastY = 0f
+    private var stillFocusX = 0f
+    private var stillFocusY = 0f
+    private var stillScaleDetector: ScaleGestureDetector? = null
+    private var stillTapDetector: GestureDetector? = null
     private var batchEnabled = false
     private var lastText = ""
     private var lastAt = 0L
@@ -155,9 +169,55 @@ class ScanFragment : Fragment() {
                 }
             }
         )
+        stillScaleDetector = ScaleGestureDetector(
+            requireContext(),
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                    stillFocusX = detector.focusX
+                    stillFocusY = detector.focusY
+                    return true
+                }
+
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    val next = (stillScale * detector.scaleFactor).coerceIn(1f, MAX_STILL_ZOOM)
+                    zoomStillTo(next, detector.focusX, detector.focusY)
+                    // Dragging with two fingers pans as well.
+                    stillTx += detector.focusX - stillFocusX
+                    stillTy += detector.focusY - stillFocusY
+                    stillFocusX = detector.focusX
+                    stillFocusY = detector.focusY
+                    applyStillTransform()
+                    return true
+                }
+            }
+        )
+        stillTapDetector = GestureDetector(
+            requireContext(),
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    if (stillScale > 1.05f) {
+                        stillScale = 1f
+                        stillTx = 0f
+                        stillTy = 0f
+                        applyStillTransform()
+                    } else {
+                        zoomStillTo(DOUBLE_TAP_ZOOM, e.x, e.y)
+                        applyStillTransform()
+                    }
+                    return true
+                }
+            }
+        )
+        binding.codeOverlay.gestureForwarder = { event ->
+            if (frozen) {
+                handleStillTouch(event)
+            } else if (pinchZoom) {
+                scaleDetector?.onTouchEvent(event)
+            }
+        }
         binding.previewView.setOnTouchListener { v, event ->
-            if (frozen) return@setOnTouchListener true
-            scaleDetector?.onTouchEvent(event)
+            if (frozen) return@setOnTouchListener handleStillTouch(event)
+            if (pinchZoom) scaleDetector?.onTouchEvent(event)
             if (event.actionMasked == MotionEvent.ACTION_DOWN) multiTouch = false
             if (event.pointerCount > 1) multiTouch = true
             if (event.actionMasked == MotionEvent.ACTION_UP && !multiTouch) {
@@ -194,6 +254,7 @@ class ScanFragment : Fragment() {
             // Provider may already be shut down.
         }
         camera = null
+        if (!frozen) Decoder.clearLatestFrame()
         _binding?.focusRing?.let {
             it.animate().cancel()
             it.visibility = View.INVISIBLE
@@ -215,6 +276,8 @@ class ScanFragment : Fragment() {
         stillBitmap?.let { if (!it.isRecycled) it.recycle() }
         stillBitmap = null
         scaleDetector = null
+        stillScaleDetector = null
+        stillTapDetector = null
         _binding = null
         super.onDestroyView()
     }
@@ -260,8 +323,90 @@ class ScanFragment : Fragment() {
         batchEnabled = settings.batchScanMode
         autoScan = settings.autoScan
         multiScan = settings.multiScan
+        pinchZoom = settings.pinchZoom
+        linkWarnings = settings.linkWarnings
+        freezeEnabled = settings.freezeButton
+        binding.codeOverlay.showBoxes = settings.showBoxes
+        binding.codeOverlay.showLabels = settings.showLabels
         tintBatch()
         updateShutter()
+    }
+
+    // ---- zoom and pan for frozen / imported pictures ----
+
+    private fun handleStillTouch(event: MotionEvent): Boolean {
+        if (!pinchZoom) return true
+        stillScaleDetector?.onTouchEvent(event)
+        stillTapDetector?.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                stillLastX = event.x
+                stillLastY = event.y
+                stillPanning = true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> stillPanning = false
+            MotionEvent.ACTION_POINTER_UP -> {
+                val keep = if (event.actionIndex == 0) 1 else 0
+                if (keep < event.pointerCount) {
+                    stillLastX = event.getX(keep)
+                    stillLastY = event.getY(keep)
+                }
+                stillPanning = event.pointerCount == 2
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (stillPanning && event.pointerCount == 1 && stillScale > 1f) {
+                    stillTx += event.x - stillLastX
+                    stillTy += event.y - stillLastY
+                    stillLastX = event.x
+                    stillLastY = event.y
+                    applyStillTransform()
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stillPanning = false
+        }
+        return true
+    }
+
+    /** Zooms to [target] while keeping the picture point under ([fx], [fy]) fixed. */
+    private fun zoomStillTo(target: Float, fx: Float, fy: Float) {
+        val b = _binding ?: return
+        val cx = b.codeOverlay.width / 2f
+        val cy = b.codeOverlay.height / 2f
+        val ratio = target / stillScale
+        stillTx = fx - cx - (fx - cx - stillTx) * ratio
+        stillTy = fy - cy - (fy - cy - stillTy) * ratio
+        stillScale = target
+    }
+
+    private fun applyStillTransform() {
+        val b = _binding ?: return
+        val bitmap = stillBitmap
+        val vw = b.codeOverlay.width.toFloat()
+        val vh = b.codeOverlay.height.toFloat()
+        if (bitmap != null && vw > 0f && vh > 0f) {
+            val fitScale = minOf(vw / bitmap.width, vh / bitmap.height)
+            val maxTx = maxOf(0f, (bitmap.width * fitScale * stillScale - vw) / 2f)
+            val maxTy = maxOf(0f, (bitmap.height * fitScale * stillScale - vh) / 2f)
+            stillTx = stillTx.coerceIn(-maxTx, maxTx)
+            stillTy = stillTy.coerceIn(-maxTy, maxTy)
+        }
+        if (stillScale <= 1.01f) {
+            stillScale = 1f
+            stillTx = 0f
+            stillTy = 0f
+        }
+        b.frozenImage.scaleX = stillScale
+        b.frozenImage.scaleY = stillScale
+        b.frozenImage.translationX = stillTx
+        b.frozenImage.translationY = stillTy
+        b.codeOverlay.setTransform(stillScale, stillTx, stillTy)
+    }
+
+    private fun resetStillTransform() {
+        stillScale = 1f
+        stillTx = 0f
+        stillTy = 0f
+        applyStillTransform()
     }
 
     // ---- freeze frame / still images (camera freeze and imported pictures) ----
@@ -282,11 +427,35 @@ class ScanFragment : Fragment() {
         stillAnalyzing = true
         updateHint(0)
         val generation = ++stillGeneration
+        val mirrored = frontFacing
         stillExecutor.execute {
-            val codes = try {
+            var codes = try {
                 Decoder.decodeStill(shot)
             } catch (_: Exception) {
                 emptyList()
+            }
+            if (codes.isEmpty()) {
+                // The on-screen bitmap can be soft or blurred; the raw camera frame is sharper.
+                val frame = try {
+                    Decoder.decodeLatestFrame()
+                } catch (_: Exception) {
+                    null
+                }
+                if (frame != null) {
+                    codes = frame.codes.map { code ->
+                        DetectedCode(
+                            code.text,
+                            code.format,
+                            code.points.map { p ->
+                                CodeGeometry.mapPoint(
+                                    p, frame.width.toFloat(), frame.height.toFloat(),
+                                    shot.width.toFloat(), shot.height.toFloat(),
+                                    fit = false, mirror = mirrored
+                                )
+                            }
+                        )
+                    }
+                }
             }
             mainHandler.post {
                 if (_binding == null || generation != stillGeneration || !frozen) return@post
@@ -318,6 +487,9 @@ class ScanFragment : Fragment() {
         openedInStill.clear()
         mainHandler.removeCallbacks(clearOverlay)
         binding.codeOverlay.clear()
+        binding.focusRing.animate().cancel()
+        binding.focusRing.visibility = View.INVISIBLE
+        resetStillTransform()
         if (previous != null && previous !== bitmap && !previous.isRecycled) previous.recycle()
         updateShutter()
     }
@@ -361,6 +533,7 @@ class ScanFragment : Fragment() {
         stillBitmap?.let { if (!it.isRecycled) it.recycle() }
         stillBitmap = null
         b.codeOverlay.clear()
+        resetStillTransform()
         openedInStill.clear()
         if (parentFragmentManager.findFragmentByTag(ResultBottomSheet.TAG) == null) {
             paused = false
@@ -388,6 +561,8 @@ class ScanFragment : Fragment() {
             b.btnShutter.contentDescription = getString(R.string.cd_shutter)
         }
         b.zoomSeek.visibility = if (frozen) View.INVISIBLE else View.VISIBLE
+        // The button stays while a picture is frozen so there is always a way back to the camera.
+        b.btnShutter.visibility = if (frozen || freezeEnabled) View.VISIBLE else View.GONE
     }
 
     private fun updateHint(liveCount: Int) {
@@ -397,13 +572,14 @@ class ScanFragment : Fragment() {
             frozen && stillCount == 0 -> R.string.hint_none_found
             frozen -> R.string.hint_tap_code
             liveCount >= 2 || (liveCount == 1 && !autoScan) -> R.string.hint_tap_code
+            liveCount == 1 -> R.string.hint_hold
             else -> R.string.hint_point
         }
         b.hintText.setText(res)
     }
 
     private fun isRisky(text: String): Boolean {
-        return Parsers.kindOf(text) == ScanKind.URL && LinkSafety.check(text).isNotEmpty()
+        return linkWarnings && Parsers.kindOf(text) == ScanKind.URL && LinkSafety.check(text).isNotEmpty()
     }
 
     /** Opens the result sheet for a code the person tapped. */
@@ -734,5 +910,7 @@ class ScanFragment : Fragment() {
         private const val STATE_PAUSED = "paused"
         private const val STATE_CAMERA = "overrideCameraId"
         private const val AUTO_OPEN_DELAY_MS = 350L
+        private const val MAX_STILL_ZOOM = 8f
+        private const val DOUBLE_TAP_ZOOM = 2.5f
     }
 }

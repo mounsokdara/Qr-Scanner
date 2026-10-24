@@ -213,4 +213,16 @@
     <string name="multi_scan_subtitle">Draws a glowing box around every code in view. Tap one to open it.</string>
     <string name="auto_scan">Auto scan</string>
     <string name="auto_scan_subtitle">Opens the result as soon as a single code is detected.</string>
+
+    <string name="show_boxes">Glowing code boxes</string>
+    <string name="show_boxes_subtitle">Draw a glowing gradient border around every detected code.</string>
+    <string name="show_labels">Code labels</string>
+    <string name="show_labels_subtitle">Show a short label such as Website · example.com next to each code.</string>
+    <string name="freeze_button">Freeze button</string>
+    <string name="freeze_button_subtitle">Show the shutter button that freezes the camera frame. Nothing is saved.</string>
+    <string name="link_warnings">Link safety warnings</string>
+    <string name="link_warnings_subtitle">Warn about risky links and never open them automatically.</string>
+    <string name="pinch_zoom">Pinch to zoom</string>
+    <string name="pinch_zoom_subtitle">Zoom the camera and frozen or imported pictures with two fingers. Double-tap a picture to zoom in.</string>
+    <string name="hint_hold">Hold steady…</string>
 </resources>
