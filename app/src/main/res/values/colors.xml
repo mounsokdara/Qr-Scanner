@@ -6,15 +6,14 @@
     <color name="cardBackground">#2C2C2C</color>
     <color name="textPrimary">#F3F3F3</color>
     <color name="textMuted">#9A9A9A</color>
-    <color name="accent">#2196F3</color>
     <color name="laser">#E53935</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
     <color name="scrim">#99000000</color>
-    <color name="star">#FFC107</color>
     <color name="headerSub">#E3F2FD</color>
     <color name="divider">#33FFFFFF</color>
     <color name="navChecked">#332196F3</color>
     <color name="warning">#FFC107</color>
+    <color name="shutterIcon">#202020</color>
     <color name="warningBg">#26FFC107</color>
 </resources>

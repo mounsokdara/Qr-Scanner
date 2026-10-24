@@ -1,6 +1,5 @@
 package com.localscanner.qr
 
-/** Pure helper that rotates a tightly packed 8-bit luminance image. */
 object LumaRotation {
     class Rotated(val data: ByteArray, val width: Int, val height: Int)
 

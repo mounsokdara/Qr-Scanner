@@ -1,7 +1,5 @@
 name: CI
 
-# Fast verification for every push and pull request: unit tests + debug build.
-# Does not sign or publish anything (the release workflow handles that on main).
 on:
   pull_request:
   push:

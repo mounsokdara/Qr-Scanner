@@ -12,10 +12,6 @@ enum class LinkRisk {
     CREDENTIALS
 }
 
-/**
- * Cheap, offline heuristics that flag links which deserve a second look before opening.
- * Pure Kotlin/JVM so it can be unit tested without Android.
- */
 object LinkSafety {
     private val SHORTENERS = setOf(
         "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly",

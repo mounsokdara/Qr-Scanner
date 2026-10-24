@@ -98,7 +98,6 @@ class ResultBottomSheet : BottomSheetDialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        // On tablets and landscape phones keep the sheet fully open and at a readable width.
         val sheet = dialog as? com.google.android.material.bottomsheet.BottomSheetDialog ?: return
         sheet.behavior.apply {
             state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED

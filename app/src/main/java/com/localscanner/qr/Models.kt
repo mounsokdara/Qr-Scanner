@@ -29,7 +29,8 @@ data class AppSettings(
     val showLabels: Boolean = true,
     val freezeButton: Boolean = true,
     val linkWarnings: Boolean = true,
-    val pinchZoom: Boolean = true
+    val pinchZoom: Boolean = true,
+    val scanBox: Boolean = true
 )
 
 data class MyQrProfile(

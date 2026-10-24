@@ -4,15 +4,15 @@
         <shape android:shape="oval">
             <solid android:color="#33000000" />
             <stroke
-                android:width="4dp"
-                android:color="@color/white" />
+                android:width="5dp"
+                android:color="#B3707070" />
         </shape>
     </item>
     <item
-        android:bottom="9dp"
-        android:left="9dp"
-        android:right="9dp"
-        android:top="9dp">
+        android:bottom="6dp"
+        android:left="6dp"
+        android:right="6dp"
+        android:top="6dp">
         <shape android:shape="oval">
             <solid android:color="@color/white" />
         </shape>

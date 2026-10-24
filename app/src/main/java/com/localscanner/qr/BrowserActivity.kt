@@ -104,7 +104,6 @@ class BrowserActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    /** Android 15 draws apps edge-to-edge, so pad the toolbar and content clear of the system bars. */
     private fun applyInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.browserRoot) { _, insets ->
             val bars = insets.getInsets(
@@ -116,7 +115,6 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    /** Always show which host is loaded, and flag unencrypted pages, so phishing is easier to spot. */
     private fun showHost(url: String) {
         val uri = Uri.parse(url)
         val host = uri.host.orEmpty()

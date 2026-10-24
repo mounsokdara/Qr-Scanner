@@ -5,8 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LumaRotationTest {
-    // 3 wide x 2 tall:  1 2 3
-    //                   4 5 6
     private val image = byteArrayOf(1, 2, 3, 4, 5, 6)
 
     @Test fun noRotationKeepsTheImage() {
@@ -20,9 +18,6 @@ class LumaRotationTest {
         val r = LumaRotation.rotateClockwise(image, 3, 2, 90)
         assertEquals(2, r.width)
         assertEquals(3, r.height)
-        // 4 1
-        // 5 2
-        // 6 3
         assertArrayEquals(byteArrayOf(4, 1, 5, 2, 6, 3), r.data)
     }
 
@@ -37,9 +32,6 @@ class LumaRotationTest {
         val r = LumaRotation.rotateClockwise(image, 3, 2, 270)
         assertEquals(2, r.width)
         assertEquals(3, r.height)
-        // 3 6
-        // 2 5
-        // 1 4
         assertArrayEquals(byteArrayOf(3, 6, 2, 5, 1, 4), r.data)
     }
 

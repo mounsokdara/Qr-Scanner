@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         store = Store(this)
-        // Android 15 enforces edge-to-edge; keep a branded bar behind the status icons.
         binding.drawerLayout.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
         if (savedInstanceState != null) {
             currentNavId = savedInstanceState.getInt(STATE_NAV, R.id.nav_scan)
@@ -134,7 +133,6 @@ class MainActivity : AppCompatActivity() {
             Actions.snackbar(binding.contentFrame, message)
             return false
         }
-        // Never auto-open links that look suspicious; the result sheet shows why instead.
         if (settings.autoOpenUrls && Payloads.isHttpUrl(text.trim()) &&
             (!settings.linkWarnings || LinkSafety.check(text).isEmpty())
         ) {

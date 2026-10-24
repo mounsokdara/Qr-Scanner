@@ -3,6 +3,8 @@
 ## Unreleased (app stays at 1.0.0 while in development)
 
 ### New
+- Camera screen restyled after Google Lens: corner-bracket scan box (can be turned off in Settings), round gallery button next to a grey-ringed search shutter, title in the top bar.
+- The glow around every detected code is now a rainbow gradient. Risky links keep a ⚠ and an amber label.
 - **Google Lens-style scanner**: every code in view gets a glowing gradient border and a short label chip (for example "Website · example.com"). Tap a code to see its details. A single code is opened automatically after a short hold.
 - **Multiple codes at once**: all QR codes in the frame are detected live; barcodes, Data Matrix, Aztec and PDF417 are found too when you freeze the frame or import an image.
 - **Freeze button** (shutter) that takes a picture of the current frame without saving anything to storage, then marks every code in it. Tap the ✕ or press Back to return to the live camera.
@@ -20,6 +22,9 @@
 - Create: pick a QR colour and error-correction level (L/M/Q/H).
 - In-app browser: reload, open in external browser, copy and share link; host is always shown and unencrypted pages are labelled.
 - Unit tests and a CI workflow that builds on every branch and pull request.
+
+### Cleanup
+- Removed all code comments, the unused Our apps screen, and unused icons, colours, strings and imports.
 
 ### Fixed
 - Glowing boxes and labels appeared in the wrong place on the live camera (offset from the real code). The camera frame was never rotated upright before its coordinates were mapped to the screen. Frames are now rotated properly, which also lets vertical barcodes decode in portrait.

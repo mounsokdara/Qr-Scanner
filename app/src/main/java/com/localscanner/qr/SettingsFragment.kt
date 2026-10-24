@@ -42,6 +42,7 @@ class SettingsFragment : Fragment() {
         binding.rowMulti.setOnClickListener { binding.checkMulti.toggle() }
         binding.rowAutoScan.setOnClickListener { binding.checkAutoScan.toggle() }
         binding.rowShowBoxes.setOnClickListener { binding.checkShowBoxes.toggle() }
+        binding.rowScanBox.setOnClickListener { binding.checkScanBox.toggle() }
         binding.rowShowLabels.setOnClickListener { binding.checkShowLabels.toggle() }
         binding.rowFreezeButton.setOnClickListener { binding.checkFreezeButton.toggle() }
         binding.rowLinkWarnings.setOnClickListener { binding.checkLinkWarnings.toggle() }
@@ -61,6 +62,7 @@ class SettingsFragment : Fragment() {
         binding.checkMulti.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkAutoScan.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkShowBoxes.setOnCheckedChangeListener { _, _ -> persist() }
+        binding.checkScanBox.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkShowLabels.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkFreezeButton.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkLinkWarnings.setOnCheckedChangeListener { _, _ -> persist() }
@@ -101,6 +103,7 @@ class SettingsFragment : Fragment() {
         binding.checkMulti.isChecked = settings.multiScan
         binding.checkAutoScan.isChecked = settings.autoScan
         binding.checkShowBoxes.isChecked = settings.showBoxes
+        binding.checkScanBox.isChecked = settings.scanBox
         binding.checkShowLabels.isChecked = settings.showLabels
         binding.checkFreezeButton.isChecked = settings.freezeButton
         binding.checkLinkWarnings.isChecked = settings.linkWarnings
@@ -132,7 +135,8 @@ class SettingsFragment : Fragment() {
                 showLabels = binding.checkShowLabels.isChecked,
                 freezeButton = binding.checkFreezeButton.isChecked,
                 linkWarnings = binding.checkLinkWarnings.isChecked,
-                pinchZoom = binding.checkPinchZoom.isChecked
+                pinchZoom = binding.checkPinchZoom.isChecked,
+                scanBox = binding.checkScanBox.isChecked
             )
         )
     }

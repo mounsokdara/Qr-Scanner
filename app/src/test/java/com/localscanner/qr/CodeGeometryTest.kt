@@ -14,7 +14,6 @@ class CodeGeometryTest {
     }
 
     @Test fun qrBoxExtendsBeyondFinderCentres() {
-        // ZXing order: bottom-left, top-left, top-right.
         val box = CodeGeometry.corners("QR_CODE", listOf(Pt(0f, 100f), Pt(0f, 0f), Pt(100f, 0f)))
         assertEquals(4, box.size)
         assertPt(-18f, -18f, box[0])
@@ -24,7 +23,6 @@ class CodeGeometryTest {
     }
 
     @Test fun rotatedQrBoxStaysAParallelogram() {
-        // Code rotated 90 degrees: "right" vector points down, "down" vector points left.
         val box = CodeGeometry.corners("QR_CODE", listOf(Pt(0f, 0f), Pt(100f, 0f), Pt(100f, 100f)))
         assertEquals(4, box.size)
         val cx = box.map { it.x }.average().toFloat()
@@ -57,7 +55,6 @@ class CodeGeometryTest {
     }
 
     @Test fun fillMappingCropsAndCentres() {
-        // 100x200 source into a 300x300 view with crop-to-fill: scale 3, vertical overflow cropped.
         val centre = CodeGeometry.mapPoint(Pt(50f, 100f), 100f, 200f, 300f, 300f, fit = false, mirror = false)
         assertPt(150f, 150f, centre)
         val top = CodeGeometry.mapPoint(Pt(0f, 0f), 100f, 200f, 300f, 300f, fit = false, mirror = false)
@@ -91,9 +88,9 @@ class CodeGeometryTest {
     @Test fun dedupeMergesRepeatsButKeepsSeparateCopies() {
         val codes = listOf(
             qr("A", 0f, 0f),
-            qr("A", 4f, 3f), // same symbol found twice
-            qr("A", 600f, 600f), // identical text, different place
-            qr("B", 0f, 0f) // different text, same place
+            qr("A", 4f, 3f),
+            qr("A", 600f, 600f),
+            qr("B", 0f, 0f)
         )
         val result = CodeGeometry.dedupe(codes)
         assertEquals(3, result.size)

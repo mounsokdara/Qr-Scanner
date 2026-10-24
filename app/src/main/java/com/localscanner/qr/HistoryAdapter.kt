@@ -21,7 +21,6 @@ class HistoryAdapter(
     private val onStar: (ScanRecord) -> Unit,
     private val onMore: (ScanRecord, android.view.View) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
     private val rows = ArrayList<HistoryRow>()
     private val dateFormat = SimpleDateFormat("M/d/yy h:mm:ss a", Locale.getDefault())
 

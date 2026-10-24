@@ -80,7 +80,6 @@ class CreateResultFragment : Fragment() {
     }
 
     private fun setupErrorCorrection() {
-        // Error correction only exists for QR codes; other symbologies ignore it.
         if (codeFormat != BarcodeFormat.QR_CODE) {
             binding.ecRow.visibility = View.GONE
             return
@@ -248,7 +247,6 @@ class CreateResultFragment : Fragment() {
         private const val STATE_COLOR = "foreground"
         private const val STATE_EC = "ecLevel"
 
-        // Dark enough on a white background that scanners still read them reliably.
         private val SWATCHES = intArrayOf(
             Color.parseColor("#000000"),
             Color.parseColor("#0D47A1"),

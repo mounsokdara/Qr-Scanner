@@ -145,12 +145,10 @@ object Transfer {
 
     private const val FORMULA_CHARS = "=+-@\t\r"
 
-    /** Spreadsheet apps run cells starting with these characters as formulas, so prefix them with a quote. */
     private fun csvSafe(value: String): String {
         return if (value.isNotEmpty() && value[0] in FORMULA_CHARS) "'$value" else value
     }
 
-    /** Reverses [csvSafe] when importing a file this app exported. */
     private fun csvUnsafe(value: String): String {
         return if (value.length > 1 && value[0] == '\'' && value[1] in FORMULA_CHARS) value.substring(1) else value
     }

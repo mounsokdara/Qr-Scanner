@@ -65,6 +65,7 @@ class ScanFragment : Fragment() {
     private var pinchZoom = true
     private var linkWarnings = true
     private var freezeEnabled = true
+    private var scanBoxEnabled = true
     private var stillScale = 1f
     private var stillTx = 0f
     private var stillTy = 0f
@@ -88,6 +89,7 @@ class ScanFragment : Fragment() {
     private var stillGeneration = 0
     private lateinit var stillExecutor: ExecutorService
     private val clearOverlay = Runnable {
+        _binding?.scanFrame?.setLocked(false)
         _binding?.codeOverlay?.clear()
         updateHint(0)
     }
@@ -181,7 +183,6 @@ class ScanFragment : Fragment() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
                     val next = (stillScale * detector.scaleFactor).coerceIn(1f, MAX_STILL_ZOOM)
                     zoomStillTo(next, detector.focusX, detector.focusY)
-                    // Dragging with two fingers pans as well.
                     stillTx += detector.focusX - stillFocusX
                     stillTy += detector.focusY - stillFocusY
                     stillFocusX = detector.focusX
@@ -251,7 +252,6 @@ class ScanFragment : Fragment() {
         try {
             cameraProvider?.unbindAll()
         } catch (_: Exception) {
-            // Provider may already be shut down.
         }
         camera = null
         if (!frozen) Decoder.clearLatestFrame()
@@ -298,18 +298,12 @@ class ScanFragment : Fragment() {
         }
     }
 
-    fun pauseScanning() {
-        paused = true
-    }
-
     fun resumeScanning() {
-        // A frozen frame stays paused until the person taps the close button.
         if (frozen) return
         paused = false
         lastAt = SystemClock.elapsedRealtime()
     }
 
-    /** Called by the activity on Back; returns true when it was used to leave the frozen frame. */
     fun handleBack(): Boolean {
         if (!frozen) return false
         exitStill()
@@ -326,13 +320,12 @@ class ScanFragment : Fragment() {
         pinchZoom = settings.pinchZoom
         linkWarnings = settings.linkWarnings
         freezeEnabled = settings.freezeButton
+        scanBoxEnabled = settings.scanBox
         binding.codeOverlay.showBoxes = settings.showBoxes
         binding.codeOverlay.showLabels = settings.showLabels
         tintBatch()
         updateShutter()
     }
-
-    // ---- zoom and pan for frozen / imported pictures ----
 
     private fun handleStillTouch(event: MotionEvent): Boolean {
         if (!pinchZoom) return true
@@ -367,7 +360,6 @@ class ScanFragment : Fragment() {
         return true
     }
 
-    /** Zooms to [target] while keeping the picture point under ([fx], [fy]) fixed. */
     private fun zoomStillTo(target: Float, fx: Float, fy: Float) {
         val b = _binding ?: return
         val cx = b.codeOverlay.width / 2f
@@ -409,8 +401,6 @@ class ScanFragment : Fragment() {
         applyStillTransform()
     }
 
-    // ---- freeze frame / still images (camera freeze and imported pictures) ----
-
     private fun toggleFreeze() {
         if (frozen) exitStill() else freezeCamera()
     }
@@ -435,7 +425,6 @@ class ScanFragment : Fragment() {
                 emptyList()
             }
             if (codes.isEmpty()) {
-                // The on-screen bitmap can be soft or blurred; the raw camera frame is sharper.
                 val frame = try {
                     Decoder.decodeLatestFrame()
                 } catch (_: Exception) {
@@ -465,7 +454,6 @@ class ScanFragment : Fragment() {
         }
     }
 
-    /** Shows an already-decoded picture (from the gallery) with a box around every code in it. */
     fun showStill(bitmap: Bitmap, codes: List<DetectedCode>) {
         if (_binding == null) {
             if (!bitmap.isRecycled) bitmap.recycle()
@@ -557,12 +545,12 @@ class ScanFragment : Fragment() {
             b.btnShutter.setImageResource(R.drawable.ic_close)
             b.btnShutter.contentDescription = getString(R.string.cd_unfreeze)
         } else {
-            b.btnShutter.setImageDrawable(null)
+            b.btnShutter.setImageResource(R.drawable.ic_search)
             b.btnShutter.contentDescription = getString(R.string.cd_shutter)
         }
         b.zoomSeek.visibility = if (frozen) View.INVISIBLE else View.VISIBLE
-        // The button stays while a picture is frozen so there is always a way back to the camera.
         b.btnShutter.visibility = if (frozen || freezeEnabled) View.VISIBLE else View.GONE
+        b.scanFrame.visibility = if (scanBoxEnabled && !frozen) View.VISIBLE else View.GONE
     }
 
     private fun updateHint(liveCount: Int) {
@@ -582,7 +570,6 @@ class ScanFragment : Fragment() {
         return linkWarnings && Parsers.kindOf(text) == ScanKind.URL && LinkSafety.check(text).isNotEmpty()
     }
 
-    /** Opens the result sheet for a code the person tapped. */
     private fun openCode(code: DetectedCode) {
         if (!isAdded) return
         val host = activity as? MainActivity ?: return
@@ -679,8 +666,6 @@ class ScanFragment : Fragment() {
         val analysisBuilder = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-        // Same 4:3 aspect for both use cases so the frame the decoder sees covers exactly the field
-        // of view on screen; that is what lets the glowing boxes line up with the codes.
         val aspect = AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_AUTO)
         previewBuilder.setResolutionSelector(
             ResolutionSelector.Builder().setAspectRatioStrategy(aspect).build()
@@ -707,7 +692,6 @@ class ScanFragment : Fragment() {
             torchOn = false
             binding.btnFlash.imageTintList = ColorStateList.valueOf(Color.WHITE)
             binding.zoomSeek.progress = 0
-            // Keep the slider in sync with pinch-to-zoom.
             camera?.cameraInfo?.zoomState?.observe(viewLifecycleOwner) { state ->
                 if (_binding != null) binding.zoomSeek.progress = (state.linearZoom * 100f).toInt()
             }
@@ -717,8 +701,6 @@ class ScanFragment : Fragment() {
     }
 
     private fun <T> applyFocus(builder: ExtendableBuilder<T>, autoFocus: Boolean) {
-        // With autofocus on, CameraX already runs continuous AF and needs to own the AF mode so
-        // tap-to-focus can trigger a one-shot focus. Only override it to turn autofocus off.
         if (autoFocus) return
         Camera2Interop.Extender(builder)
             .setCaptureRequestOption(
@@ -802,13 +784,11 @@ class ScanFragment : Fragment() {
                 val success = try {
                     future.get().isFocusSuccessful
                 } catch (_: Exception) {
-                    // Cancelled by a newer tap or the camera was unbound.
                     return@addListener
                 }
                 finishFocusRing(success)
             }, ContextCompat.getMainExecutor(requireContext()))
         } catch (_: Exception) {
-            // Some cameras do not support touch focus.
         }
     }
 
@@ -848,7 +828,6 @@ class ScanFragment : Fragment() {
                 onFrame(frame, front)
             }
         } catch (_: Exception) {
-            // Keep the analyzer alive after a bad frame.
         } finally {
             image.close()
         }
@@ -862,6 +841,7 @@ class ScanFragment : Fragment() {
             CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
         }
         binding.codeOverlay.setCodes(items, frame.width, frame.height, fitCenter = false, mirrored = front)
+        binding.scanFrame.setLocked(true)
         mainHandler.removeCallbacks(clearOverlay)
         mainHandler.postDelayed(clearOverlay, 450L)
 
@@ -884,7 +864,6 @@ class ScanFragment : Fragment() {
                 stableText = text
                 stableSince = now
             }
-            // Hold for a moment so the glowing box is visible before the result opens.
             if (now - stableSince >= AUTO_OPEN_DELAY_MS) {
                 onLiveCode(text, frame.codes.first { it.text == text }.format)
             }

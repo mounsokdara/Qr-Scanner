@@ -20,6 +20,11 @@
         android:scaleType="fitCenter"
         android:visibility="gone" />
 
+    <com.localscanner.qr.ScanFrameView
+        android:id="@+id/scanFrame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <com.localscanner.qr.CodeOverlayView
         android:id="@+id/codeOverlay"
         android:layout_width="match_parent"
@@ -44,67 +49,71 @@
         android:focusable="false"
         android:visibility="invisible" />
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@drawable/bg_top_bar"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp">
+        android:background="@drawable/bg_top_bar">
 
-        <ImageButton
-            android:id="@+id/btnMenu"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cd_menu"
-            android:src="@drawable/ic_menu"
-            app:tint="@color/white" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="@string/app_name"
+            android:textColor="@color/white"
+            android:textSize="20sp" />
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
 
-        <ImageButton
-            android:id="@+id/btnGallery"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cd_gallery"
-            android:src="@drawable/ic_image"
-            app:tint="@color/white" />
+            <ImageButton
+                android:id="@+id/btnMenu"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/cd_menu"
+                android:src="@drawable/ic_menu"
+                app:tint="@color/white" />
 
-        <ImageButton
-            android:id="@+id/btnFlash"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cd_flash"
-            android:src="@drawable/ic_flash"
-            app:tint="@color/white" />
+            <ImageButton
+                android:id="@+id/btnFlash"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/cd_flash"
+                android:src="@drawable/ic_flash"
+                app:tint="@color/white" />
 
-        <ImageButton
-            android:id="@+id/btnSwitch"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_circle_btn"
-            android:contentDescription="@string/cd_switch"
-            android:src="@drawable/ic_switch"
-            app:tint="@color/white" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
-        <ImageButton
-            android:id="@+id/btnBatch"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/cd_batch"
-            android:src="@drawable/ic_batch"
-            android:visibility="gone"
-            app:tint="@color/white" />
-    </LinearLayout>
+            <ImageButton
+                android:id="@+id/btnBatch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/cd_batch"
+                android:src="@drawable/ic_batch"
+                android:visibility="gone"
+                app:tint="@color/white" />
+
+            <ImageButton
+                android:id="@+id/btnSwitch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circle_btn"
+                android:contentDescription="@string/cd_switch"
+                android:src="@drawable/ic_switch"
+                app:tint="@color/white" />
+        </LinearLayout>
+    </FrameLayout>
 
     <TextView
         android:id="@+id/hintText"
@@ -138,15 +147,41 @@
             android:progressTint="@color/colorPrimary"
             android:thumbTint="@color/colorPrimary" />
 
-        <ImageButton
-            android:id="@+id/btnShutter"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:background="@drawable/bg_shutter"
-            android:contentDescription="@string/cd_shutter"
-            android:padding="26dp"
-            android:scaleType="fitCenter" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btnGallery"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="36dp"
+                android:background="@drawable/bg_gallery_btn"
+                android:contentDescription="@string/cd_gallery"
+                android:padding="16dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_image"
+                app:tint="@color/white" />
+
+            <ImageButton
+                android:id="@+id/btnShutter"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="@drawable/bg_shutter"
+                android:contentDescription="@string/cd_shutter"
+                android:padding="26dp"
+                android:scaleType="fitCenter"
+                app:tint="@color/shutterIcon" />
+
+            <View
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="36dp"
+                android:visibility="invisible" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

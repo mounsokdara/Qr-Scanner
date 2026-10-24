@@ -23,16 +23,10 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * Draws a glowing gradient border around every detected code, with a short tappable label chip
- * (Google Lens style). Touches that miss a code fall through to the views underneath so
- * tap-to-focus and pinch-to-zoom keep working.
- */
 class CodeOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
-
     class Item(val code: DetectedCode, val label: String, val risky: Boolean)
 
     private class Drawn(
@@ -48,7 +42,6 @@ class CodeOverlayView @JvmOverloads constructor(
 
     var onItemTap: ((DetectedCode) -> Unit)? = null
 
-    /** Receives every touch event the overlay consumes, so the host can zoom and pan a still picture. */
     var gestureForwarder: ((MotionEvent) -> Unit)? = null
 
     var showBoxes = true
@@ -99,6 +92,10 @@ class CodeOverlayView @JvmOverloads constructor(
         style = Paint.Style.FILL
         color = Color.argb(224, 20, 20, 24)
     }
+    private val chipFillRisky = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(235, 62, 38, 0)
+    }
     private val chipStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1.5f * density
@@ -123,7 +120,6 @@ class CodeOverlayView @JvmOverloads constructor(
         invalidate()
     }
 
-    /** Zoom/pan applied around the view centre, matching a scaled and translated ImageView underneath. */
     fun setTransform(scale: Float, tx: Float, ty: Float) {
         zoomScale = scale
         zoomTx = tx
@@ -194,7 +190,6 @@ class CodeOverlayView @JvmOverloads constructor(
                 val p = CodeGeometry.mapPoint(it, srcW.toFloat(), srcH.toFloat(), vw, vh, fit, mirror)
                 Pt((p.x - vw / 2f) * zoomScale + vw / 2f + zoomTx, (p.y - vh / 2f) * zoomScale + vh / 2f + zoomTy)
             }
-            // Skip codes that have been zoomed or panned completely out of view.
             if (quad.maxOf { it.x } < 0f || quad.minOf { it.x } > vw ||
                 quad.maxOf { it.y } < 0f || quad.minOf { it.y } > vh
             ) {
@@ -207,8 +202,7 @@ class CodeOverlayView @JvmOverloads constructor(
             }
             val cx = quad.map { it.x }.average().toFloat()
             val cy = quad.map { it.y }.average().toFloat()
-            val colors = if (item.risky) RISKY else NORMAL
-            val shader = SweepGradient(cx, cy, colors, null)
+            val shader = SweepGradient(cx, cy, RAINBOW, null)
             val text = TextUtils.ellipsize(
                 item.label, textPaint, maxChipW - 2 * padH, TextUtils.TruncateAt.END
             ).toString()
@@ -222,7 +216,6 @@ class CodeOverlayView @JvmOverloads constructor(
             val left = (cx - chipW / 2f).coerceIn(8f * density, max(8f * density, vw - chipW - 8f * density))
             list.add(Drawn(item, quad, path, cx, cy, shader, text, RectF(left, top, left + chipW, top + chipH)))
         }
-        // Nudge overlapping chips apart so neighbouring labels stay readable.
         val placed = ArrayList<RectF>()
         for (d in list.sortedBy { it.chip.top }) {
             var guard = 0
@@ -257,8 +250,13 @@ class CodeOverlayView @JvmOverloads constructor(
             }
             if (showLabels) {
                 val r = d.chip.height() / 2f
-                canvas.drawRoundRect(d.chip, r, r, chipFill)
-                chipStroke.shader = d.shader
+                canvas.drawRoundRect(d.chip, r, r, if (d.item.risky) chipFillRisky else chipFill)
+                if (d.item.risky) {
+                    chipStroke.shader = null
+                    chipStroke.color = Color.parseColor("#FFC107")
+                } else {
+                    chipStroke.shader = d.shader
+                }
                 canvas.drawRoundRect(d.chip, r, r, chipStroke)
                 val baseline = d.chip.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
                 canvas.drawText(d.chipText, d.chip.left + 12f * density, baseline, textPaint)
@@ -328,19 +326,15 @@ class CodeOverlayView @JvmOverloads constructor(
     companion object {
         private val GLOW_WIDTHS = floatArrayOf(20f, 13f, 8f)
         private val GLOW_ALPHA = floatArrayOf(0.10f, 0.17f, 0.28f)
-        private val NORMAL = intArrayOf(
-            Color.parseColor("#00E5FF"),
-            Color.parseColor("#2979FF"),
-            Color.parseColor("#B388FF"),
-            Color.parseColor("#FF4081"),
-            Color.parseColor("#00E5FF")
-        )
-        private val RISKY = intArrayOf(
-            Color.parseColor("#FFC107"),
-            Color.parseColor("#FF9800"),
-            Color.parseColor("#FF5722"),
+        private val RAINBOW = intArrayOf(
             Color.parseColor("#FF1744"),
-            Color.parseColor("#FFC107")
+            Color.parseColor("#FF9100"),
+            Color.parseColor("#FFEA00"),
+            Color.parseColor("#00E676"),
+            Color.parseColor("#00B0FF"),
+            Color.parseColor("#2979FF"),
+            Color.parseColor("#D500F9"),
+            Color.parseColor("#FF1744")
         )
     }
 }

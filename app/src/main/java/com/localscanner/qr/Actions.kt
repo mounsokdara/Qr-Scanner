@@ -44,7 +44,6 @@ object Actions {
         if (settings.soundOnScan) {
             try {
                 val audio = context.getSystemService(AudioManager::class.java)
-                // Stay quiet in silent / vibrate-only ringer modes.
                 if (audio == null || audio.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
                     val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
                     tone.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
@@ -52,12 +51,10 @@ object Actions {
                         try {
                             tone.release()
                         } catch (_: Exception) {
-                            // Already released.
                         }
                     }, 250)
                 }
             } catch (_: Exception) {
-                // Beep is optional.
             }
         }
         if (settings.vibrateOnScan) {
@@ -72,7 +69,6 @@ object Actions {
                     vibrator.vibrate(effect)
                 }
             } catch (_: Exception) {
-                // Vibration is optional.
             }
         }
     }

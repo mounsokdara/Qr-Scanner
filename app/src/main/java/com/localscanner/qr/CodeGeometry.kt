@@ -6,16 +6,9 @@ import kotlin.math.min
 
 data class Pt(val x: Float, val y: Float)
 
-/** A decoded symbol plus the points ZXing reported for it, in the coordinate space of the decoded image. */
 data class DetectedCode(val text: String, val format: String, val points: List<Pt>)
 
-/** Pure geometry helpers (no Android classes) so they can be unit tested. */
 object CodeGeometry {
-    /**
-     * Four corners (clockwise) of a box that covers the whole symbol. ZXing only reports a few
-     * anchor points (three finder centres for QR, a scan line for 1D barcodes), so the box is
-     * extrapolated from them.
-     */
     fun corners(format: String, points: List<Pt>): List<Pt> {
         if (points.isEmpty()) return emptyList()
         return when {
@@ -75,10 +68,6 @@ object CodeGeometry {
         )
     }
 
-    /**
-     * Maps a point from a source image into a view. [fit] = letterbox (fitCenter, used for stills),
-     * otherwise crop-to-fill (fillCenter, used for the live preview). [mirror] flips x for selfie cameras.
-     */
     fun mapPoint(
         p: Pt,
         srcW: Float,
@@ -95,7 +84,6 @@ object CodeGeometry {
         return Pt(x * scale + dx, p.y * scale + dy)
     }
 
-    /** Ray-casting point-in-polygon test. */
     fun contains(polygon: List<Pt>, x: Float, y: Float): Boolean {
         if (polygon.size < 3) return false
         var inside = false
@@ -113,7 +101,6 @@ object CodeGeometry {
         return inside
     }
 
-    /** Drops repeated detections of the same symbol while keeping identical codes that sit apart. */
     fun dedupe(codes: List<DetectedCode>): List<DetectedCode> {
         val kept = ArrayList<DetectedCode>()
         for (code in codes) {

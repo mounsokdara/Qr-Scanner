@@ -3,7 +3,6 @@
     <string name="app_name">QR &amp; Barcode Scanner</string>
     <string name="share_promo">I\'m using QR &amp; Barcode Scanner, the fastest QR and Barcode reader.</string>
     <string name="our_apps_subtitle">The fastest QR and Barcode reader.</string>
-    <string name="no_ads">This version has no ads.</string>
     <string name="my_qr_help">Share your contact info via QR. Only enter data you want to share. When done click the check mark. Next time you open My QR your contact QR will be displayed.</string>
     <string name="invalid_entry">Invalid entry</string>
     <string name="empty">Empty</string>
@@ -18,8 +17,6 @@
     <string name="create_qr">Create QR</string>
     <string name="settings">Settings</string>
     <string name="share">Share</string>
-    <string name="our_apps">Our apps</string>
-    <string name="remove_ads">Remove ads</string>
 
     <string name="batch_scan_mode">Batch scan mode</string>
     <string name="batch_scan_subtitle">Add option for batch scan to scan screen</string>
@@ -225,4 +222,6 @@
     <string name="pinch_zoom">Pinch to zoom</string>
     <string name="pinch_zoom_subtitle">Zoom the camera and frozen or imported pictures with two fingers. Double-tap a picture to zoom in.</string>
     <string name="hint_hold">Hold steady…</string>
+    <string name="scan_box">Scan box</string>
+    <string name="scan_box_subtitle">Show the corner-bracket viewfinder on the camera screen.</string>
 </resources>

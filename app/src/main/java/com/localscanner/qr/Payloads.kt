@@ -413,7 +413,6 @@ object Payloads {
         return BuiltCode(text, BarcodeFormat.QR_CODE)
     }
 
-    /** Splits "First Middle Last" into (given, family). A single word is treated as the family name. */
     private fun splitName(name: String): Pair<String, String> {
         val trimmed = name.trim()
         val index = trimmed.lastIndexOf(' ')

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Build the unsigned release APK. Signing is a separate step (scripts/sign-apk.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 chmod +x ./gradlew

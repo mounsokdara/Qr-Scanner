@@ -62,15 +62,6 @@ class Store(context: Context) {
         readHistory().firstOrNull { it.text == text }
     }
 
-    fun saveRecord(updated: ScanRecord) = synchronized(lock) {
-        val history = readHistory().toMutableList()
-        val index = history.indexOfFirst { it.id == updated.id }
-        if (index >= 0) {
-            history[index] = updated
-            writeHistory(history)
-        }
-    }
-
     fun setFavorite(id: String, favorite: Boolean): ScanRecord? = synchronized(lock) {
         val history = readHistory().toMutableList()
         val index = history.indexOfFirst { it.id == id }
@@ -228,7 +219,8 @@ class Store(context: Context) {
                 showLabels = bool(obj, "showLabels", true),
                 freezeButton = bool(obj, "freezeButton", true),
                 linkWarnings = bool(obj, "linkWarnings", true),
-                pinchZoom = bool(obj, "pinchZoom", true)
+                pinchZoom = bool(obj, "pinchZoom", true),
+                scanBox = bool(obj, "scanBox", true)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -257,6 +249,7 @@ class Store(context: Context) {
             .put("freezeButton", settings.freezeButton)
             .put("linkWarnings", settings.linkWarnings)
             .put("pinchZoom", settings.pinchZoom)
+            .put("scanBox", settings.scanBox)
     }
 
     private fun readMyQr(): MyQrProfile {

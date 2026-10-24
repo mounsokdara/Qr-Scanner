@@ -12,7 +12,6 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.LuminanceSource
 import com.google.zxing.MultiFormatReader
-import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.Result
@@ -42,13 +41,8 @@ object Decoder {
 
     @Volatile private var latestFrame: LuminanceSource? = null
 
-    /** Codes found in one camera frame, in the upright (rotated) coordinate space of that frame. */
     class LiveFrame(val codes: List<DetectedCode>, val width: Int, val height: Int)
 
-    /**
-     * Fast per-frame decode. With [multi] on it finds every QR code in view; otherwise (or when no
-     * QR is found) it falls back to the single-symbol reader that handles all barcode formats.
-     */
     fun decodeLive(image: ImageProxy, multi: Boolean): LiveFrame? {
         val source = try {
             yuvToLuminance(image)
@@ -58,7 +52,6 @@ object Decoder {
         latestFrame = source
         var codes = decodeLiveSource(source, multi)
         if (codes.isEmpty()) {
-            // Inverted (light-on-dark) codes are rare; trying them on every frame doubles the CPU cost.
             invertTick = (invertTick + 1) % 3
             if (invertTick == 0) {
                 codes = try {
@@ -82,7 +75,6 @@ object Decoder {
         return listOfNotNull(toCode(single))
     }
 
-    /** Thorough decode of the newest camera frame (sharper than the on-screen preview bitmap). */
     fun decodeLatestFrame(): LiveFrame? {
         val source = latestFrame ?: return null
         val codes = decodeStillSource(source)
@@ -93,10 +85,6 @@ object Decoder {
         latestFrame = null
     }
 
-    /**
-     * Thorough decode of a still image (frozen camera frame or imported picture). Finds every
-     * code, of every supported format, trying both polarities and two binarizers.
-     */
     fun decodeStill(bitmap: Bitmap): List<DetectedCode> {
         val source = try {
             bitmapToSource(bitmap)
@@ -112,7 +100,6 @@ object Decoder {
         try {
             variants.add(source.invert())
         } catch (_: Exception) {
-            // Inverted pass is optional.
         }
         for (variant in variants) {
             val attempts = listOf<() -> BinaryBitmap>(
@@ -137,7 +124,6 @@ object Decoder {
                 toCode(result)?.let { out.add(it) }
             }
         } catch (_: Exception) {
-            // NotFoundException just means nothing was found on this pass.
         }
         out.addAll(multiQr(bitmap, hints))
         return out
@@ -215,8 +201,6 @@ object Decoder {
                 }
             }
         }
-        // ZXing's PlanarYUVLuminanceSource cannot rotate itself, so turn the frame upright here.
-        // Everything downstream (result points, overlay mapping, vertical barcodes) relies on it.
         val upright = LumaRotation.rotateClockwise(packed, width, height, image.imageInfo.rotationDegrees)
         return PlanarYUVLuminanceSource(
             upright.data, upright.width, upright.height, 0, 0, upright.width, upright.height, false

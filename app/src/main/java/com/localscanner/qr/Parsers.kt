@@ -25,7 +25,6 @@ data class EventInfo(
     val allDay: Boolean
 )
 
-/** Pure Kotlin/JVM parsing helpers (no Android classes) so they can be unit tested. */
 object Parsers {
     fun kindOf(raw: String): ScanKind {
         val t = raw.trim()
@@ -43,7 +42,6 @@ object Parsers {
         }
     }
 
-    /** A short one-line detail for a code (host, SSID, contact name...), used in chips and headers. */
     fun detail(raw: String, maxLen: Int = 28): String {
         val t = raw.trim()
         val value = when (kindOf(t)) {
@@ -147,7 +145,6 @@ object Parsers {
         return EventInfo(title, location, description, start, end, allDay)
     }
 
-    /** Returns epoch millis and whether the value was a date without a time. */
     fun parseIcsDate(value: String, zone: TimeZone = TimeZone.getDefault()): Pair<Long, Boolean>? {
         val v = value.trim()
         return try {
@@ -180,7 +177,6 @@ object Parsers {
         }
     }
 
-    /** RFC 6350 / 5545 line unfolding: continuation lines start with a space or tab. */
     fun unfold(raw: String): List<String> {
         val lines = ArrayList<String>()
         for (line in raw.split(Regex("\r\n|\n|\r"))) {
