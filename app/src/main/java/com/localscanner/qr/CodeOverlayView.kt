@@ -36,6 +36,7 @@ class CodeOverlayView @JvmOverloads constructor(
         val cx: Float,
         val cy: Float,
         val shader: SweepGradient,
+        val effect: CornerPathEffect,
         val chipText: String,
         val chip: RectF
     )
@@ -102,7 +103,7 @@ class CodeOverlayView @JvmOverloads constructor(
     }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 13f * scaledDensity
+        textSize = 11f * scaledDensity
         typeface = Typeface.DEFAULT_BOLD
     }
 
@@ -179,17 +180,18 @@ class CodeOverlayView @JvmOverloads constructor(
         }
         val vw = width.toFloat()
         val vh = height.toFloat()
-        val maxChipW = min(vw - 24f * density, 280f * density)
-        val chipH = 30f * density
-        val padH = 12f * density
+        val maxChipW = min(vw - 24f * density, 220f * density)
+        val chipH = 24f * density
+        val padH = 10f * density
         val list = ArrayList<Drawn>()
         for (item in items) {
-            val corners = CodeGeometry.corners(item.code.format, item.code.points)
+            val corners = item.code.box()
             if (corners.size < 4) continue
-            val quad = corners.map {
+            val mapped = corners.map {
                 val p = CodeGeometry.mapPoint(it, srcW.toFloat(), srcH.toFloat(), vw, vh, fit, mirror)
                 Pt((p.x - vw / 2f) * zoomScale + vw / 2f + zoomTx, (p.y - vh / 2f) * zoomScale + vh / 2f + zoomTy)
             }
+            val quad = CodeGeometry.inflate(mapped, 2.5f * density)
             if (quad.maxOf { it.x } < 0f || quad.minOf { it.x } > vw ||
                 quad.maxOf { it.y } < 0f || quad.minOf { it.y } > vh
             ) {
@@ -203,6 +205,8 @@ class CodeOverlayView @JvmOverloads constructor(
             val cx = quad.map { it.x }.average().toFloat()
             val cy = quad.map { it.y }.average().toFloat()
             val shader = SweepGradient(cx, cy, RAINBOW, null)
+            val shortSide = min(quad.maxOf { it.x } - quad.minOf { it.x }, quad.maxOf { it.y } - quad.minOf { it.y })
+            val effect = CornerPathEffect((shortSide * 0.05f).coerceIn(2f * density, 8f * density))
             val text = TextUtils.ellipsize(
                 item.label, textPaint, maxChipW - 2 * padH, TextUtils.TruncateAt.END
             ).toString()
@@ -214,7 +218,7 @@ class CodeOverlayView @JvmOverloads constructor(
             if (top + chipH > vh - chipBottomMargin) top = cy - chipH / 2f
             top = top.coerceIn(chipTopMargin, max(chipTopMargin, vh - chipBottomMargin - chipH))
             val left = (cx - chipW / 2f).coerceIn(8f * density, max(8f * density, vw - chipW - 8f * density))
-            list.add(Drawn(item, quad, path, cx, cy, shader, text, RectF(left, top, left + chipW, top + chipH)))
+            list.add(Drawn(item, quad, path, cx, cy, shader, effect, text, RectF(left, top, left + chipW, top + chipH)))
         }
         val placed = ArrayList<RectF>()
         for (d in list.sortedBy { it.chip.top }) {
@@ -235,6 +239,8 @@ class CodeOverlayView @JvmOverloads constructor(
             matrix.setRotate(phase * 360f, d.cx, d.cy)
             d.shader.setLocalMatrix(matrix)
             if (showBoxes) {
+                strokePaint.pathEffect = d.effect
+                fillPaint.pathEffect = d.effect
                 strokePaint.shader = d.shader
                 for (i in GLOW_WIDTHS.indices) {
                     strokePaint.strokeWidth = GLOW_WIDTHS[i] * density
@@ -259,7 +265,7 @@ class CodeOverlayView @JvmOverloads constructor(
                 }
                 canvas.drawRoundRect(d.chip, r, r, chipStroke)
                 val baseline = d.chip.centerY() - (textPaint.descent() + textPaint.ascent()) / 2f
-                canvas.drawText(d.chipText, d.chip.left + 12f * density, baseline, textPaint)
+                canvas.drawText(d.chipText, d.chip.left + 10f * density, baseline, textPaint)
             }
         }
     }

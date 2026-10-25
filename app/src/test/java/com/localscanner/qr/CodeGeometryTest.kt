@@ -96,4 +96,60 @@ class CodeGeometryTest {
         assertEquals(3, result.size)
         assertEquals(listOf("A", "A", "B"), result.map { it.text })
     }
+
+    @Test fun unmapUndoesMap() {
+        for (fit in listOf(true, false)) {
+            for (mirror in listOf(true, false)) {
+                val p = Pt(37f, 91f)
+                val mapped = CodeGeometry.mapPoint(p, 100f, 200f, 300f, 340f, fit, mirror)
+                val back = CodeGeometry.unmapPoint(mapped, 100f, 200f, 300f, 340f, fit, mirror)
+                assertPt(37f, 91f, back)
+            }
+        }
+    }
+
+    @Test fun viewToImageIsIdentityWithoutZoom() {
+        val direct = CodeGeometry.unmapPoint(Pt(120f, 80f), 400f, 300f, 200f, 300f, true, false)
+        val viaZoom = CodeGeometry.viewToImage(Pt(120f, 80f), 400f, 300f, 200f, 300f, 1f, 0f, 0f)
+        assertPt(direct.x, direct.y, viaZoom)
+    }
+
+    @Test fun viewToImageFollowsZoomAndPan() {
+        val centre = CodeGeometry.viewToImage(Pt(100f, 150f), 400f, 300f, 200f, 300f, 2f, 0f, 0f)
+        val straight = CodeGeometry.unmapPoint(Pt(100f, 150f), 400f, 300f, 200f, 300f, true, false)
+        assertPt(straight.x, straight.y, centre)
+        val panned = CodeGeometry.viewToImage(Pt(150f, 150f), 400f, 300f, 200f, 300f, 2f, 50f, 0f)
+        assertPt(straight.x, straight.y, panned)
+    }
+
+    @Test fun scanSquareIsCentredAndSeventyPercentOfTheShortSide() {
+        val square = CodeGeometry.scanSquare(1000f, 2000f)
+        assertEquals(700f, square[2] - square[0], eps)
+        assertEquals(700f, square[3] - square[1], eps)
+        assertEquals(500f, (square[0] + square[2]) / 2f, eps)
+        assertEquals(880f, (square[1] + square[3]) / 2f, eps)
+    }
+
+    @Test fun inflateGrowsEveryEdgeByTheSameAmount() {
+        val grown = CodeGeometry.inflate(listOf(Pt(0f, 0f), Pt(10f, 0f), Pt(10f, 10f), Pt(0f, 10f)), 1f)
+        assertPt(-1f, -1f, grown[0])
+        assertPt(11f, -1f, grown[1])
+        assertPt(11f, 11f, grown[2])
+        assertPt(-1f, 11f, grown[3])
+    }
+
+    @Test fun refinedQuadWinsOverTheExtrapolatedBox() {
+        val points = listOf(Pt(0f, 100f), Pt(0f, 0f), Pt(100f, 0f))
+        val quad = listOf(Pt(1f, 1f), Pt(5f, 1f), Pt(5f, 5f), Pt(1f, 5f))
+        assertEquals(quad, DetectedCode("A", "QR_CODE", points, 2f, quad).box())
+        assertEquals(4, DetectedCode("A", "QR_CODE", points).box().size)
+    }
+
+    @Test fun transformMovesPointsAndQuadAndScalesTheModule() {
+        val code = DetectedCode("A", "QR_CODE", listOf(Pt(1f, 1f)), 2f, listOf(Pt(2f, 2f)))
+        val moved = code.transformed({ Pt(it.x * 2f + 10f, it.y * 2f) }, 2f)
+        assertPt(12f, 2f, moved.points[0])
+        assertPt(14f, 4f, moved.quad!![0])
+        assertEquals(4f, moved.moduleSize, eps)
+    }
 }

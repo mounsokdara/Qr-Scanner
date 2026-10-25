@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.RectF
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
@@ -44,6 +45,8 @@ import com.localscanner.qr.databinding.LayoutScanBinding
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.ceil
+import kotlin.math.floor
 
 class ScanFragment : Fragment() {
     private var _binding: LayoutScanBinding? = null
@@ -61,11 +64,12 @@ class ScanFragment : Fragment() {
     @Volatile private var frozen = false
     @Volatile private var multiScan = true
     @Volatile private var frontFacing = false
-    private var autoScan = true
     private var pinchZoom = true
     private var linkWarnings = true
-    private var freezeEnabled = true
-    private var scanBoxEnabled = true
+    private var cropMode = false
+    private var stillCodes: List<DetectedCode> = emptyList()
+    @Volatile private var viewW = 0
+    @Volatile private var viewH = 0
     private var stillScale = 1f
     private var stillTx = 0f
     private var stillTy = 0f
@@ -79,8 +83,6 @@ class ScanFragment : Fragment() {
     private var batchEnabled = false
     private var lastText = ""
     private var lastAt = 0L
-    private var stableText: String? = null
-    private var stableSince = 0L
     private val seen = HashMap<String, Long>()
     private val openedInStill = HashSet<String>()
     private var stillBitmap: Bitmap? = null
@@ -136,6 +138,12 @@ class ScanFragment : Fragment() {
             (activity as? MainActivity)?.pickImage()
         }
         binding.btnShutter.setOnClickListener { toggleFreeze() }
+        binding.btnCrop.setOnClickListener { setCropMode(!cropMode) }
+        binding.cropSelect.onSelected = { rect -> rescanArea(rect) }
+        binding.previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            viewW = right - left
+            viewH = bottom - top
+        }
         binding.codeOverlay.onItemTap = { code -> openCode(code) }
         binding.btnFlash.setOnClickListener { toggleTorch() }
         binding.btnSwitch.setOnClickListener { switchCamera() }
@@ -315,16 +323,15 @@ class ScanFragment : Fragment() {
         binding.btnBatch.visibility = if (settings.batchScanMode) View.VISIBLE else View.GONE
         if (!settings.batchScanMode) batchActive = false
         batchEnabled = settings.batchScanMode
-        autoScan = settings.autoScan
+        if (multiScan != settings.multiScan) binding.codeOverlay.clear()
         multiScan = settings.multiScan
         pinchZoom = settings.pinchZoom
         linkWarnings = settings.linkWarnings
-        freezeEnabled = settings.freezeButton
-        scanBoxEnabled = settings.scanBox
         binding.codeOverlay.showBoxes = settings.showBoxes
         binding.codeOverlay.showLabels = settings.showLabels
         tintBatch()
         updateShutter()
+        updateHint(0)
     }
 
     private fun handleStillTouch(event: MotionEvent): Boolean {
@@ -432,17 +439,13 @@ class ScanFragment : Fragment() {
                 }
                 if (frame != null) {
                     codes = frame.codes.map { code ->
-                        DetectedCode(
-                            code.text,
-                            code.format,
-                            code.points.map { p ->
-                                CodeGeometry.mapPoint(
-                                    p, frame.width.toFloat(), frame.height.toFloat(),
-                                    shot.width.toFloat(), shot.height.toFloat(),
-                                    fit = false, mirror = mirrored
-                                )
-                            }
-                        )
+                        code.transformed({ p ->
+                            CodeGeometry.mapPoint(
+                                p, frame.width.toFloat(), frame.height.toFloat(),
+                                shot.width.toFloat(), shot.height.toFloat(),
+                                fit = false, mirror = mirrored
+                            )
+                        })
                     }
                 }
             }
@@ -473,6 +476,10 @@ class ScanFragment : Fragment() {
         frozen = true
         paused = true
         openedInStill.clear()
+        stillCodes = emptyList()
+        cropMode = false
+        binding.cropSelect.visibility = View.GONE
+        binding.cropSelect.reset()
         mainHandler.removeCallbacks(clearOverlay)
         binding.codeOverlay.clear()
         binding.focusRing.animate().cancel()
@@ -482,8 +489,9 @@ class ScanFragment : Fragment() {
         updateShutter()
     }
 
-    private fun applyStillCodes(codes: List<DetectedCode>) {
+    private fun applyStillCodes(codes: List<DetectedCode>, announce: Boolean = true) {
         val bitmap = stillBitmap ?: return
+        stillCodes = codes
         stillCount = codes.size
         val context = requireContext()
         val items = codes.map { code ->
@@ -493,11 +501,11 @@ class ScanFragment : Fragment() {
         binding.codeOverlay.setCodes(items, bitmap.width, bitmap.height, fitCenter = true, mirrored = false)
         updateHint(0)
         if (codes.isEmpty()) {
-            Toast.makeText(context, R.string.no_code_found, Toast.LENGTH_SHORT).show()
+            if (announce) Toast.makeText(context, R.string.no_code_found, Toast.LENGTH_SHORT).show()
             return
         }
-        Actions.feedback(context)
-        if (codes.size == 1 && autoScan) {
+        if (announce) Actions.feedback(context)
+        if (announce && codes.size == 1 && !multiScan) {
             val only = codes[0]
             mainHandler.postDelayed({
                 if (frozen && _binding != null &&
@@ -514,8 +522,12 @@ class ScanFragment : Fragment() {
         frozen = false
         stillAnalyzing = false
         stillCount = 0
+        stillCodes = emptyList()
+        cropMode = false
         mainHandler.removeCallbacksAndMessages(null)
         val b = _binding ?: return
+        b.cropSelect.visibility = View.GONE
+        b.cropSelect.reset()
         b.frozenImage.visibility = View.GONE
         b.frozenImage.setImageDrawable(null)
         stillBitmap?.let { if (!it.isRecycled) it.recycle() }
@@ -549,21 +561,81 @@ class ScanFragment : Fragment() {
             b.btnShutter.contentDescription = getString(R.string.cd_shutter)
         }
         b.zoomSeek.visibility = if (frozen) View.INVISIBLE else View.VISIBLE
-        b.btnShutter.visibility = if (frozen || freezeEnabled) View.VISIBLE else View.GONE
-        b.scanFrame.visibility = if (scanBoxEnabled && !frozen) View.VISIBLE else View.GONE
+        b.btnShutter.visibility = if (multiScan || frozen) View.VISIBLE else View.GONE
+        b.btnCrop.visibility = when {
+            frozen -> View.VISIBLE
+            multiScan -> View.INVISIBLE
+            else -> View.GONE
+        }
+        b.btnCrop.imageTintList = ColorStateList.valueOf(
+            if (cropMode) ContextCompat.getColor(requireContext(), R.color.colorPrimary) else Color.WHITE
+        )
+        b.scanFrame.visibility = if (!multiScan && !frozen) View.VISIBLE else View.GONE
     }
 
     private fun updateHint(liveCount: Int) {
         val b = _binding ?: return
         val res = when {
+            frozen && cropMode -> R.string.hint_crop
             frozen && stillAnalyzing -> R.string.hint_analyzing
             frozen && stillCount == 0 -> R.string.hint_none_found
             frozen -> R.string.hint_tap_code
-            liveCount >= 2 || (liveCount == 1 && !autoScan) -> R.string.hint_tap_code
-            liveCount == 1 -> R.string.hint_hold
-            else -> R.string.hint_point
+            multiScan && liveCount >= 1 -> R.string.hint_tap_code
+            multiScan -> R.string.hint_point
+            else -> R.string.hint_align
         }
         b.hintText.setText(res)
+    }
+
+    private fun setCropMode(on: Boolean) {
+        val b = _binding ?: return
+        cropMode = on && frozen
+        b.cropSelect.visibility = if (cropMode) View.VISIBLE else View.GONE
+        b.cropSelect.reset()
+        updateShutter()
+        updateHint(0)
+    }
+
+    private fun rescanArea(selection: RectF) {
+        val bitmap = stillBitmap ?: return
+        val b = _binding ?: return
+        val vw = b.codeOverlay.width.toFloat()
+        val vh = b.codeOverlay.height.toFloat()
+        val iw = bitmap.width.toFloat()
+        val ih = bitmap.height.toFloat()
+        val p1 = CodeGeometry.viewToImage(Pt(selection.left, selection.top), iw, ih, vw, vh, stillScale, stillTx, stillTy)
+        val p2 = CodeGeometry.viewToImage(Pt(selection.right, selection.bottom), iw, ih, vw, vh, stillScale, stillTx, stillTy)
+        val left = floor(minOf(p1.x, p2.x)).toInt().coerceIn(0, bitmap.width - 1)
+        val top = floor(minOf(p1.y, p2.y)).toInt().coerceIn(0, bitmap.height - 1)
+        val right = ceil(maxOf(p1.x, p2.x)).toInt().coerceIn(left + 1, bitmap.width)
+        val bottom = ceil(maxOf(p1.y, p2.y)).toInt().coerceIn(top + 1, bitmap.height)
+        val width = right - left
+        val height = bottom - top
+        if (width < 16 || height < 16) {
+            setCropMode(false)
+            return
+        }
+        setCropMode(false)
+        stillAnalyzing = true
+        updateHint(0)
+        val generation = ++stillGeneration
+        stillExecutor.execute {
+            val found = try {
+                Decoder.rescan(bitmap, left, top, width, height)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            mainHandler.post {
+                if (_binding == null || generation != stillGeneration || !frozen) return@post
+                stillAnalyzing = false
+                if (found.isEmpty()) {
+                    Toast.makeText(requireContext(), R.string.rescan_failed, Toast.LENGTH_LONG).show()
+                    applyStillCodes(stillCodes, announce = false)
+                } else {
+                    applyStillCodes(CodeGeometry.dedupe(stillCodes + found), announce = true)
+                }
+            }
+        }
     }
 
     private fun isRisky(text: String): Boolean {
@@ -821,7 +893,7 @@ class ScanFragment : Fragment() {
     private fun analyze(image: ImageProxy) {
         try {
             if (paused || frozen) return
-            val frame = Decoder.decodeLive(image, multiScan) ?: return
+            val frame = Decoder.decodeLive(image, multiScan, viewW, viewH, frontFacing) ?: return
             val front = frontFacing
             mainHandler.post {
                 if (!isAdded || _binding == null) return@post
@@ -836,15 +908,16 @@ class ScanFragment : Fragment() {
     private fun onFrame(frame: Decoder.LiveFrame, front: Boolean) {
         if (paused || frozen) return
         val context = requireContext()
-        val items = frame.codes.map { code ->
-            val risky = isRisky(code.text)
-            CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
-        }
-        binding.codeOverlay.setCodes(items, frame.width, frame.height, fitCenter = false, mirrored = front)
         binding.scanFrame.setLocked(true)
         mainHandler.removeCallbacks(clearOverlay)
         mainHandler.postDelayed(clearOverlay, 450L)
-
+        if (multiScan) {
+            val items = frame.codes.map { code ->
+                val risky = isRisky(code.text)
+                CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
+            }
+            binding.codeOverlay.setCodes(items, frame.width, frame.height, fitCenter = false, mirrored = front)
+        }
         val now = SystemClock.elapsedRealtime()
         if (batchEnabled && batchActive) {
             for (code in frame.codes) {
@@ -857,18 +930,10 @@ class ScanFragment : Fragment() {
             updateHint(frame.codes.size)
             return
         }
-        val distinct = frame.codes.map { it.text }.distinct()
-        if (distinct.size == 1 && autoScan) {
-            val text = distinct[0]
-            if (text != stableText) {
-                stableText = text
-                stableSince = now
-            }
-            if (now - stableSince >= AUTO_OPEN_DELAY_MS) {
-                onLiveCode(text, frame.codes.first { it.text == text }.format)
-            }
-        } else {
-            stableText = null
+        if (!multiScan) {
+            val first = frame.codes.first()
+            onLiveCode(first.text, first.format)
+            return
         }
         updateHint(frame.codes.size)
     }
@@ -888,7 +953,6 @@ class ScanFragment : Fragment() {
         private const val STATE_BATCH = "batchActive"
         private const val STATE_PAUSED = "paused"
         private const val STATE_CAMERA = "overrideCameraId"
-        private const val AUTO_OPEN_DELAY_MS = 350L
         private const val MAX_STILL_ZOOM = 8f
         private const val DOUBLE_TAP_ZOOM = 2.5f
     }

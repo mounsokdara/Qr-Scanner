@@ -40,11 +40,8 @@ class SettingsFragment : Fragment() {
         binding.rowSound.setOnClickListener { binding.checkSound.toggle() }
         binding.rowVibrate.setOnClickListener { binding.checkVibrate.toggle() }
         binding.rowMulti.setOnClickListener { binding.checkMulti.toggle() }
-        binding.rowAutoScan.setOnClickListener { binding.checkAutoScan.toggle() }
         binding.rowShowBoxes.setOnClickListener { binding.checkShowBoxes.toggle() }
-        binding.rowScanBox.setOnClickListener { binding.checkScanBox.toggle() }
         binding.rowShowLabels.setOnClickListener { binding.checkShowLabels.toggle() }
-        binding.rowFreezeButton.setOnClickListener { binding.checkFreezeButton.toggle() }
         binding.rowLinkWarnings.setOnClickListener { binding.checkLinkWarnings.toggle() }
         binding.rowPinchZoom.setOnClickListener { binding.checkPinchZoom.toggle() }
         binding.checkBatch.setOnCheckedChangeListener { _, _ -> persist() }
@@ -60,11 +57,8 @@ class SettingsFragment : Fragment() {
         binding.checkSound.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkVibrate.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkMulti.setOnCheckedChangeListener { _, _ -> persist() }
-        binding.checkAutoScan.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkShowBoxes.setOnCheckedChangeListener { _, _ -> persist() }
-        binding.checkScanBox.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkShowLabels.setOnCheckedChangeListener { _, _ -> persist() }
-        binding.checkFreezeButton.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkLinkWarnings.setOnCheckedChangeListener { _, _ -> persist() }
         binding.checkPinchZoom.setOnCheckedChangeListener { _, _ -> persist() }
         binding.rowCustom.setOnClickListener { editCustomAction() }
@@ -101,11 +95,8 @@ class SettingsFragment : Fragment() {
         binding.checkSound.isChecked = settings.soundOnScan
         binding.checkVibrate.isChecked = settings.vibrateOnScan
         binding.checkMulti.isChecked = settings.multiScan
-        binding.checkAutoScan.isChecked = settings.autoScan
         binding.checkShowBoxes.isChecked = settings.showBoxes
-        binding.checkScanBox.isChecked = settings.scanBox
         binding.checkShowLabels.isChecked = settings.showLabels
-        binding.checkFreezeButton.isChecked = settings.freezeButton
         binding.checkLinkWarnings.isChecked = settings.linkWarnings
         binding.checkPinchZoom.isChecked = settings.pinchZoom
         binding.valueCustom.text = settings.customActionUrl.ifBlank { getString(R.string.none) }
@@ -130,13 +121,10 @@ class SettingsFragment : Fragment() {
                 soundOnScan = binding.checkSound.isChecked,
                 vibrateOnScan = binding.checkVibrate.isChecked,
                 multiScan = binding.checkMulti.isChecked,
-                autoScan = binding.checkAutoScan.isChecked,
                 showBoxes = binding.checkShowBoxes.isChecked,
                 showLabels = binding.checkShowLabels.isChecked,
-                freezeButton = binding.checkFreezeButton.isChecked,
                 linkWarnings = binding.checkLinkWarnings.isChecked,
-                pinchZoom = binding.checkPinchZoom.isChecked,
-                scanBox = binding.checkScanBox.isChecked
+                pinchZoom = binding.checkPinchZoom.isChecked
             )
         )
     }

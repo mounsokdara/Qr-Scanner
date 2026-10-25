@@ -250,7 +250,7 @@ class MainActivity : AppCompatActivity() {
             }
             mainHandler.post {
                 val picture = bitmap
-                if (isDestroyed || picture == null || codes.isEmpty()) {
+                if (isDestroyed || picture == null) {
                     if (picture != null && !picture.isRecycled) picture.recycle()
                     if (!isDestroyed) {
                         val message = if (unreadable) R.string.could_not_open_image else R.string.no_code_found

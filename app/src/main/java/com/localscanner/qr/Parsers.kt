@@ -26,6 +26,16 @@ data class EventInfo(
 )
 
 object Parsers {
+    fun isReadable(text: String): Boolean {
+        if (text.isEmpty()) return false
+        if (text.indexOf('\uFFFD') >= 0) return false
+        var control = 0
+        for (c in text) {
+            if (c.code < 32 && c != '\n' && c != '\r' && c != '\t') control++
+        }
+        return control * 10 <= text.length
+    }
+
     fun kindOf(raw: String): ScanKind {
         val t = raw.trim()
         fun starts(prefix: String) = t.startsWith(prefix, ignoreCase = true)

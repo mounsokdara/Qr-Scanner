@@ -119,4 +119,12 @@ class ParsersTest {
         assertEquals(10, long.length)
         assertTrue(long.endsWith("…"))
     }
+
+    @Test fun garbageDecodesAreNotReadable() {
+        assertTrue(Parsers.isReadable("https://example.com"))
+        assertTrue(Parsers.isReadable("Line one\nLine two"))
+        assertTrue(!Parsers.isReadable("PBZ \uFFFD%cd`bb``\uFFFDe"))
+        assertTrue(!Parsers.isReadable("\u0001\u0002\u0003abc"))
+        assertTrue(!Parsers.isReadable(""))
+    }
 }

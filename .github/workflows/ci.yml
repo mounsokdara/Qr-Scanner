@@ -50,7 +50,7 @@ jobs:
               t += int(r.get('tests')); f += int(r.get('failures'))
               e += int(r.get('errors')); s += int(r.get('skipped'))
           print(f"::notice title=Unit tests::{t} tests, {f} failures, {e} errors, {s} skipped")
-          assert t >= 25 and f == 0 and e == 0, "unit tests missing or failing"
+          assert t >= 50 and f == 0 and e == 0, "unit tests missing or failing"
           PY
 
       - name: Build debug APK

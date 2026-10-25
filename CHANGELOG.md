@@ -3,6 +3,11 @@
 ## Unreleased (app stays at 1.0.0 while in development)
 
 ### New
+- **Multiple QR scan** is now the one switch for how the camera works.
+  - On: freeze button, a rainbow glow around every QR code and barcode, label chips, and nothing opens until you tap a code.
+  - Off: the classic centred square scan box, which only reads inside the box and opens the code it finds. No glow.
+- **Crop and rescan**: freeze the camera or import a picture, tap the crop button and draw a box around a code that would not read. The area is enlarged, sharpened and deblurred before decoding. In tests this recovered 8 of 10 heavily blurred QR codes that normal decoding missed 9 of.
+- Imported pictures always open for inspection, even when no code is found, so you can zoom and rescan.
 - Camera screen restyled after Google Lens: corner-bracket scan box (can be turned off in Settings), round gallery button next to a grey-ringed search shutter, title in the top bar.
 - The glow around every detected code is now a rainbow gradient. Risky links keep a ⚠ and an amber label.
 - **Google Lens-style scanner**: every code in view gets a glowing gradient border and a short label chip (for example "Website · example.com"). Tap a code to see its details. A single code is opened automatically after a short hold.
@@ -12,7 +17,7 @@
 - Risky links get an amber/red glow and a warning marker on their label.
 - Result sheet header with a type icon and short title, centred and capped in width on tablets.
 - Tablet layouts: history and the create list become multi-column grids, forms and settings keep a readable width.
-- Settings: turn each feature on or off: scan multiple codes, auto scan, glowing boxes, code labels, freeze button, link safety warnings, pinch to zoom.
+- Settings: turn features on or off: Multiple QR scan, glowing boxes, code labels, link safety warnings, pinch to zoom. The separate freeze button, scan box and auto scan switches were folded into Multiple QR scan.
 - Zoom and pan frozen or imported pictures with pinch and drag, or double-tap to zoom. The boxes follow the picture and labels stay readable.
 - Smart result actions by content type: **Connect** to Wi-Fi (Android 11+), **Add contact**, **Add event**, **Call**, **Send email**, **Send SMS**, **Show map**.
 - Link safety banner on scanned URLs (http, raw IP, punycode / look-alike characters, URL shorteners, `user@host` tricks). Suspicious links are no longer auto-opened.
@@ -27,6 +32,9 @@
 - Removed all code comments, the unused Our apps screen, and unused icons, colours, strings and imports.
 
 ### Fixed
+- Boxes now wrap the real pixels of the code instead of an estimate. QR boxes are within about a pixel, barcode boxes follow the actual bars (previously the height was a guess and could be off by a hundred pixels), and tilted barcodes are handled.
+- The glow border sits just outside the code so it no longer covers the modules, with small corner rounding.
+- Garbled "codes" full of replacement characters are no longer shown.
 - Glowing boxes and labels appeared in the wrong place on the live camera (offset from the real code). The camera frame was never rotated upright before its coordinates were mapped to the screen. Frames are now rotated properly, which also lets vertical barcodes decode in portrait.
 - Freeze sometimes reported "No code found" for a code the live view could see; it now falls back to the sharper raw camera frame.
 - The focus ring no longer lingers on a frozen picture, and the hint says "Hold steady…" while a single code is about to open.

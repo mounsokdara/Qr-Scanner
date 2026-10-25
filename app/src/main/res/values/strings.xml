@@ -203,25 +203,22 @@
     <string name="hint_point">Point the camera at a code</string>
     <string name="hint_tap_code">Tap a code to open it</string>
     <string name="hint_analyzing">Looking for codes…</string>
-    <string name="hint_none_found">No code found. Tap ✕ to go back.</string>
     <string name="cd_shutter">Freeze frame</string>
     <string name="cd_unfreeze">Back to live camera</string>
-    <string name="multi_scan">Scan multiple codes</string>
-    <string name="multi_scan_subtitle">Draws a glowing box around every code in view. Tap one to open it.</string>
-    <string name="auto_scan">Auto scan</string>
-    <string name="auto_scan_subtitle">Opens the result as soon as a single code is detected.</string>
 
     <string name="show_boxes">Glowing code boxes</string>
     <string name="show_boxes_subtitle">Draw a glowing gradient border around every detected code.</string>
     <string name="show_labels">Code labels</string>
     <string name="show_labels_subtitle">Show a short label such as Website · example.com next to each code.</string>
-    <string name="freeze_button">Freeze button</string>
-    <string name="freeze_button_subtitle">Show the shutter button that freezes the camera frame. Nothing is saved.</string>
     <string name="link_warnings">Link safety warnings</string>
     <string name="link_warnings_subtitle">Warn about risky links and never open them automatically.</string>
     <string name="pinch_zoom">Pinch to zoom</string>
     <string name="pinch_zoom_subtitle">Zoom the camera and frozen or imported pictures with two fingers. Double-tap a picture to zoom in.</string>
-    <string name="hint_hold">Hold steady…</string>
-    <string name="scan_box">Scan box</string>
-    <string name="scan_box_subtitle">Show the corner-bracket viewfinder on the camera screen.</string>
+    <string name="multi_scan">Multiple QR scan</string>
+    <string name="multi_scan_subtitle">On: freeze button and a rainbow glowing box around every code; tap a code to open it. Off: classic square scan box that opens the code it reads.</string>
+    <string name="hint_align">Align the code inside the box</string>
+    <string name="hint_crop">Draw a box around the code to rescan it</string>
+    <string name="hint_none_found">No code found. Tap the crop button and draw a box around it, or tap ✕.</string>
+    <string name="rescan_failed">Still can\'t read that area. Try a tighter box or a sharper picture.</string>
+    <string name="cd_crop">Crop and rescan</string>
 </resources>

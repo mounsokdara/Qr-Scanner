@@ -6,7 +6,23 @@ import kotlin.math.min
 
 data class Pt(val x: Float, val y: Float)
 
-data class DetectedCode(val text: String, val format: String, val points: List<Pt>)
+data class DetectedCode(
+    val text: String,
+    val format: String,
+    val points: List<Pt>,
+    val moduleSize: Float = 0f,
+    val quad: List<Pt>? = null
+) {
+    fun box(): List<Pt> = quad ?: CodeGeometry.corners(format, points)
+
+    fun transformed(map: (Pt) -> Pt, scale: Float = 1f): DetectedCode = DetectedCode(
+        text,
+        format,
+        points.map(map),
+        moduleSize * scale,
+        quad?.map(map)
+    )
+}
 
 object CodeGeometry {
     fun corners(format: String, points: List<Pt>): List<Pt> {
@@ -84,6 +100,81 @@ object CodeGeometry {
         return Pt(x * scale + dx, p.y * scale + dy)
     }
 
+    fun unmapPoint(
+        p: Pt,
+        srcW: Float,
+        srcH: Float,
+        viewW: Float,
+        viewH: Float,
+        fit: Boolean,
+        mirror: Boolean
+    ): Pt {
+        val scale = if (fit) min(viewW / srcW, viewH / srcH) else max(viewW / srcW, viewH / srcH)
+        val dx = (viewW - srcW * scale) / 2f
+        val dy = (viewH - srcH * scale) / 2f
+        val x = (p.x - dx) / scale
+        return Pt(if (mirror) srcW - x else x, (p.y - dy) / scale)
+    }
+
+    fun viewToImage(
+        view: Pt,
+        imageW: Float,
+        imageH: Float,
+        viewW: Float,
+        viewH: Float,
+        zoom: Float,
+        tx: Float,
+        ty: Float
+    ): Pt {
+        val cx = viewW / 2f
+        val cy = viewH / 2f
+        val fitted = Pt(cx + (view.x - cx - tx) / zoom, cy + (view.y - cy - ty) / zoom)
+        return unmapPoint(fitted, imageW, imageH, viewW, viewH, fit = true, mirror = false)
+    }
+
+    fun scanSquare(viewW: Float, viewH: Float): FloatArray {
+        val side = min(viewW, viewH) * 0.70f
+        val cx = viewW / 2f
+        val cy = viewH * 0.44f
+        return floatArrayOf(cx - side / 2f, cy - side / 2f, cx + side / 2f, cy + side / 2f)
+    }
+
+    fun inflate(quad: List<Pt>, delta: Float): List<Pt> {
+        if (quad.size < 3) return quad
+        val cx = quad.map { it.x }.average().toFloat()
+        val cy = quad.map { it.y }.average().toFloat()
+        fun normal(a: Pt, b: Pt): Pt {
+            val dx = b.x - a.x
+            val dy = b.y - a.y
+            val len = max(hypot(dx, dy), 1e-6f)
+            var nx = dy / len
+            var ny = -dx / len
+            val mx = (a.x + b.x) / 2f - cx
+            val my = (a.y + b.y) / 2f - cy
+            if (nx * mx + ny * my < 0f) {
+                nx = -nx
+                ny = -ny
+            }
+            return Pt(nx, ny)
+        }
+        return quad.indices.map { i ->
+            val prev = quad[(i + quad.size - 1) % quad.size]
+            val cur = quad[i]
+            val next = quad[(i + 1) % quad.size]
+            val n1 = normal(prev, cur)
+            val n2 = normal(cur, next)
+            val denom = 1f + n1.x * n2.x + n1.y * n2.y
+            if (denom < 0.2f) {
+                val sx = n1.x + n2.x
+                val sy = n1.y + n2.y
+                val len = max(hypot(sx, sy), 1e-6f)
+                Pt(cur.x + sx / len * delta * 1.5f, cur.y + sy / len * delta * 1.5f)
+            } else {
+                Pt(cur.x + (n1.x + n2.x) * delta / denom, cur.y + (n1.y + n2.y) * delta / denom)
+            }
+        }
+    }
+
     fun contains(polygon: List<Pt>, x: Float, y: Float): Boolean {
         if (polygon.size < 3) return false
         var inside = false
@@ -104,13 +195,13 @@ object CodeGeometry {
     fun dedupe(codes: List<DetectedCode>): List<DetectedCode> {
         val kept = ArrayList<DetectedCode>()
         for (code in codes) {
-            val box = corners(code.format, code.points)
+            val box = code.box()
             if (box.isEmpty()) continue
             val cx = box.map { it.x }.average().toFloat()
             val cy = box.map { it.y }.average().toFloat()
             val duplicate = kept.any { other ->
                 if (other.text != code.text || other.format != code.format) return@any false
-                val ob = corners(other.format, other.points)
+                val ob = other.box()
                 val ox = ob.map { it.x }.average().toFloat()
                 val oy = ob.map { it.y }.average().toFloat()
                 val diag = hypot(ob[2].x - ob[0].x, ob[2].y - ob[0].y)

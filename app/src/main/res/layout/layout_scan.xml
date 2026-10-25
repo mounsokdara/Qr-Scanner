@@ -30,6 +30,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.localscanner.qr.CropSelectView
+        android:id="@+id/cropSelect"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/shutterFlash"
         android:layout_width="match_parent"
@@ -158,7 +164,6 @@
                 android:id="@+id/btnGallery"
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:layout_marginEnd="36dp"
                 android:background="@drawable/bg_gallery_btn"
                 android:contentDescription="@string/cd_gallery"
                 android:padding="16dp"
@@ -170,17 +175,25 @@
                 android:id="@+id/btnShutter"
                 android:layout_width="80dp"
                 android:layout_height="80dp"
+                android:layout_marginStart="36dp"
+                android:layout_marginEnd="36dp"
                 android:background="@drawable/bg_shutter"
                 android:contentDescription="@string/cd_shutter"
                 android:padding="26dp"
                 android:scaleType="fitCenter"
                 app:tint="@color/shutterIcon" />
 
-            <View
+            <ImageButton
+                android:id="@+id/btnCrop"
                 android:layout_width="56dp"
                 android:layout_height="56dp"
-                android:layout_marginStart="36dp"
-                android:visibility="invisible" />
+                android:background="@drawable/bg_gallery_btn"
+                android:contentDescription="@string/cd_crop"
+                android:padding="16dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_crop"
+                android:visibility="invisible"
+                app:tint="@color/white" />
         </LinearLayout>
     </LinearLayout>
 
