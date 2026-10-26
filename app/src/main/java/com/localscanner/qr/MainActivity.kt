@@ -72,6 +72,16 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.openDrawer(GravityCompat.START)
     }
 
+    /** Edge-swipe opening of the menu; the menu button keeps working when disabled. */
+    fun setDrawerSwipeEnabled(enabled: Boolean) {
+        val mode = if (enabled) {
+            androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_UNLOCKED
+        } else {
+            androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_LOCKED_CLOSED
+        }
+        binding.drawerLayout.setDrawerLockMode(mode, GravityCompat.START)
+    }
+
     fun toolbarMenu(): android.view.Menu = binding.toolbar.menu
 
     fun applyToolbar(

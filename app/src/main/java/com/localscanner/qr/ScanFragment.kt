@@ -79,8 +79,6 @@ class ScanFragment : Fragment() {
     private var stillPanning = false
     private var stillLastX = 0f
     private var stillLastY = 0f
-    private var stillFocusX = 0f
-    private var stillFocusY = 0f
     private var stillAnim: ValueAnimator? = null
     private var zoomTarget = -1f
     private var zoomCurrent = -1f
@@ -216,19 +214,11 @@ class ScanFragment : Fragment() {
         stillScaleDetector = ScaleGestureDetector(
             requireContext(),
             object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                    stillFocusX = detector.focusX
-                    stillFocusY = detector.focusY
-                    return true
-                }
+                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean = true
 
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
                     val next = (stillScale * detector.scaleFactor).coerceIn(1f, MAX_STILL_ZOOM)
                     zoomStillTo(next, detector.focusX, detector.focusY)
-                    stillTx += detector.focusX - stillFocusX
-                    stillTy += detector.focusY - stillFocusY
-                    stillFocusX = detector.focusX
-                    stillFocusY = detector.focusY
                     applyStillTransform()
                     return true
                 }
@@ -305,6 +295,7 @@ class ScanFragment : Fragment() {
         camera = null
         stopSmoothZoom()
         stillAnim?.cancel()
+        (activity as? MainActivity)?.setDrawerSwipeEnabled(true)
         if (!frozen) Decoder.clearLatestFrame()
         _binding?.focusRing?.let {
             it.animate().cancel()
@@ -381,38 +372,54 @@ class ScanFragment : Fragment() {
 
     private fun handleStillTouch(event: MotionEvent): Boolean {
         if (!pinchZoom) return true
-        if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+        val action = event.actionMasked
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             stillAnim?.cancel()
         }
         stillScaleDetector?.onTouchEvent(event)
         stillTapDetector?.onTouchEvent(event)
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                stillLastX = event.x
-                stillLastY = event.y
+        when (action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                trackStillFocus(event, -1)
                 stillPanning = true
             }
-            MotionEvent.ACTION_POINTER_DOWN -> stillPanning = false
             MotionEvent.ACTION_POINTER_UP -> {
-                val keep = if (event.actionIndex == 0) 1 else 0
-                if (keep < event.pointerCount) {
-                    stillLastX = event.getX(keep)
-                    stillLastY = event.getY(keep)
-                }
-                stillPanning = event.pointerCount == 2
+                trackStillFocus(event, event.actionIndex)
+                stillPanning = true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (stillPanning && !cropMode && event.pointerCount == 1 && stillScale > 1f && stillAnim?.isRunning != true) {
-                    stillTx += event.x - stillLastX
-                    stillTy += event.y - stillLastY
-                    stillLastX = event.x
-                    stillLastY = event.y
+                val fingers = event.pointerCount
+                // While drawing a crop box one finger draws; panning needs two fingers.
+                val canPan = fingers >= 2 || !cropMode
+                if (stillPanning && canPan && stillAnim?.isRunning != true) {
+                    val prevX = stillLastX
+                    val prevY = stillLastY
+                    trackStillFocus(event, -1)
+                    stillTx += stillLastX - prevX
+                    stillTy += stillLastY - prevY
                     applyStillTransform()
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stillPanning = false
         }
         return true
+    }
+
+    /** Stores the centre of all fingers (except [skipIndex]) so pan follows the whole gesture. */
+    private fun trackStillFocus(event: MotionEvent, skipIndex: Int) {
+        var sumX = 0f
+        var sumY = 0f
+        var count = 0
+        for (i in 0 until event.pointerCount) {
+            if (i == skipIndex) continue
+            sumX += event.getX(i)
+            sumY += event.getY(i)
+            count++
+        }
+        if (count > 0) {
+            stillLastX = sumX / count
+            stillLastY = sumY / count
+        }
     }
 
     private fun zoomStillTo(target: Float, fx: Float, fy: Float) {
@@ -447,6 +454,10 @@ class ScanFragment : Fragment() {
         b.frozenImage.translationX = stillTx
         b.frozenImage.translationY = stillTy
         b.codeOverlay.setTransform(stillScale, stillTx, stillTy)
+    }
+
+    private fun updateDrawerLock() {
+        (activity as? MainActivity)?.setDrawerSwipeEnabled(!frozen)
     }
 
     private fun smoothZoomTo(ratio: Float) {
@@ -640,6 +651,7 @@ class ScanFragment : Fragment() {
 
     private fun updateShutter() {
         val b = _binding ?: return
+        updateDrawerLock()
         if (frozen) {
             b.btnShutter.setImageResource(R.drawable.ic_close)
             b.btnShutter.contentDescription = getString(R.string.cd_unfreeze)
