@@ -114,7 +114,7 @@
                 android:id="@+id/btnSwitch"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:background="@drawable/bg_circle_btn"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/cd_switch"
                 android:src="@drawable/ic_switch"
                 app:tint="@color/white" />

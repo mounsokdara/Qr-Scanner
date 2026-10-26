@@ -18,6 +18,9 @@ class CropSelectView @JvmOverloads constructor(
 
     var onSelected: ((RectF) -> Unit)? = null
 
+    /** Receives every touch event so pinch-zoom and double-tap keep working while drawing. */
+    var gestureForwarder: ((MotionEvent) -> Unit)? = null
+
     private val density = resources.displayMetrics.density
     private val dim = Paint().apply { color = Color.argb(140, 0, 0, 0) }
     private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -32,6 +35,7 @@ class CropSelectView @JvmOverloads constructor(
     private var endY = 0f
     private var drawing = false
     private var hasRect = false
+    private var multiTouch = false
 
     fun reset() {
         drawing = false
@@ -47,6 +51,20 @@ class CropSelectView @JvmOverloads constructor(
     )
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        gestureForwarder?.invoke(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                multiTouch = true
+                reset()
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (multiTouch) {
+                multiTouch = false
+                reset()
+                return true
+            }
+        }
+        if (multiTouch) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 startX = event.x

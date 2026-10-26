@@ -17,7 +17,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Size
+import android.animation.ValueAnimator
+import android.view.Choreographer
 import android.view.LayoutInflater
+import android.view.animation.PathInterpolator
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -78,6 +81,34 @@ class ScanFragment : Fragment() {
     private var stillLastY = 0f
     private var stillFocusX = 0f
     private var stillFocusY = 0f
+    private var stillAnim: ValueAnimator? = null
+    private var zoomTarget = -1f
+    private var zoomCurrent = -1f
+    private var zoomLastFrame = 0L
+    private var zoomAnimating = false
+    private val zoomFrame = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            val active = camera
+            val state = active?.cameraInfo?.zoomState?.value
+            if (active == null || state == null || zoomTarget < 0f || zoomCurrent < 0f) {
+                zoomAnimating = false
+                return
+            }
+            val dt = if (zoomLastFrame == 0L) 16f else ((frameTimeNanos - zoomLastFrame) / 1_000_000f).coerceIn(1f, 50f)
+            zoomLastFrame = frameTimeNanos
+            val alpha = 1f - kotlin.math.exp(-dt / ZOOM_SMOOTH_MS)
+            val next = zoomCurrent + (zoomTarget - zoomCurrent) * alpha
+            val done = kotlin.math.abs(zoomTarget - next) < 0.003f * zoomTarget
+            zoomCurrent = if (done) zoomTarget else next
+            active.cameraControl.setZoomRatio(zoomCurrent.coerceIn(state.minZoomRatio, state.maxZoomRatio))
+            if (done) {
+                zoomAnimating = false
+                zoomLastFrame = 0L
+            } else {
+                Choreographer.getInstance().postFrameCallback(this)
+            }
+        }
+    }
     private var stillScaleDetector: ScaleGestureDetector? = null
     private var stillTapDetector: GestureDetector? = null
     private var batchEnabled = false
@@ -158,7 +189,11 @@ class ScanFragment : Fragment() {
         binding.zoomSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    camera?.cameraControl?.setLinearZoom(progress / 100f)
+                    val state = camera?.cameraInfo?.zoomState?.value ?: return
+                    val l = progress / 100f
+                    val min = state.minZoomRatio
+                    val max = state.maxZoomRatio
+                    smoothZoomTo(1f / ((1f - l) / min + l / max))
                 }
             }
 
@@ -172,9 +207,8 @@ class ScanFragment : Fragment() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
                     val active = camera ?: return true
                     val state = active.cameraInfo.zoomState.value ?: return true
-                    val ratio = (state.zoomRatio * detector.scaleFactor)
-                        .coerceIn(state.minZoomRatio, state.maxZoomRatio)
-                    active.cameraControl.setZoomRatio(ratio)
+                    val base = if (zoomTarget > 0f) zoomTarget else state.zoomRatio
+                    smoothZoomTo(base * detector.scaleFactor)
                     return true
                 }
             }
@@ -205,18 +239,25 @@ class ScanFragment : Fragment() {
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDoubleTap(e: MotionEvent): Boolean {
                     if (stillScale > 1.05f) {
-                        stillScale = 1f
-                        stillTx = 0f
-                        stillTy = 0f
-                        applyStillTransform()
+                        animateStillTo(1f, 0f, 0f)
                     } else {
+                        val s0 = stillScale
+                        val x0 = stillTx
+                        val y0 = stillTy
                         zoomStillTo(DOUBLE_TAP_ZOOM, e.x, e.y)
-                        applyStillTransform()
+                        val s1 = stillScale
+                        val x1 = stillTx
+                        val y1 = stillTy
+                        stillScale = s0
+                        stillTx = x0
+                        stillTy = y0
+                        animateStillTo(s1, x1, y1)
                     }
                     return true
                 }
             }
         )
+        binding.cropSelect.gestureForwarder = { event -> handleStillTouch(event) }
         binding.codeOverlay.gestureForwarder = { event ->
             if (frozen) {
                 handleStillTouch(event)
@@ -262,6 +303,8 @@ class ScanFragment : Fragment() {
         } catch (_: Exception) {
         }
         camera = null
+        stopSmoothZoom()
+        stillAnim?.cancel()
         if (!frozen) Decoder.clearLatestFrame()
         _binding?.focusRing?.let {
             it.animate().cancel()
@@ -279,6 +322,8 @@ class ScanFragment : Fragment() {
 
     override fun onDestroyView() {
         mainHandler.removeCallbacksAndMessages(null)
+        stopSmoothZoom()
+        stillAnim?.cancel()
         stillGeneration++
         frozen = false
         stillBitmap?.let { if (!it.isRecycled) it.recycle() }
@@ -336,6 +381,9 @@ class ScanFragment : Fragment() {
 
     private fun handleStillTouch(event: MotionEvent): Boolean {
         if (!pinchZoom) return true
+        if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            stillAnim?.cancel()
+        }
         stillScaleDetector?.onTouchEvent(event)
         stillTapDetector?.onTouchEvent(event)
         when (event.actionMasked) {
@@ -354,7 +402,7 @@ class ScanFragment : Fragment() {
                 stillPanning = event.pointerCount == 2
             }
             MotionEvent.ACTION_MOVE -> {
-                if (stillPanning && event.pointerCount == 1 && stillScale > 1f) {
+                if (stillPanning && !cropMode && event.pointerCount == 1 && stillScale > 1f && stillAnim?.isRunning != true) {
                     stillTx += event.x - stillLastX
                     stillTy += event.y - stillLastY
                     stillLastX = event.x
@@ -401,7 +449,46 @@ class ScanFragment : Fragment() {
         b.codeOverlay.setTransform(stillScale, stillTx, stillTy)
     }
 
+    private fun smoothZoomTo(ratio: Float) {
+        val state = camera?.cameraInfo?.zoomState?.value ?: return
+        zoomTarget = ratio.coerceIn(state.minZoomRatio, state.maxZoomRatio)
+        if (zoomCurrent < 0f) zoomCurrent = state.zoomRatio
+        if (!zoomAnimating) {
+            zoomAnimating = true
+            zoomLastFrame = 0L
+            Choreographer.getInstance().postFrameCallback(zoomFrame)
+        }
+    }
+
+    private fun stopSmoothZoom() {
+        Choreographer.getInstance().removeFrameCallback(zoomFrame)
+        zoomAnimating = false
+        zoomLastFrame = 0L
+        zoomTarget = -1f
+        zoomCurrent = -1f
+    }
+
+    private fun animateStillTo(scale: Float, tx: Float, ty: Float) {
+        stillAnim?.cancel()
+        val s0 = stillScale
+        val x0 = stillTx
+        val y0 = stillTy
+        stillAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 300L
+            interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                stillScale = s0 + (scale - s0) * t
+                stillTx = x0 + (tx - x0) * t
+                stillTy = y0 + (ty - y0) * t
+                applyStillTransform()
+            }
+            start()
+        }
+    }
+
     private fun resetStillTransform() {
+        stillAnim?.cancel()
         stillScale = 1f
         stillTx = 0f
         stillTy = 0f
@@ -760,6 +847,7 @@ class ScanFragment : Fragment() {
         }
         try {
             provider.unbindAll()
+            stopSmoothZoom()
             camera = provider.bindToLifecycle(viewLifecycleOwner, selector, preview, analysis)
             torchOn = false
             binding.btnFlash.imageTintList = ColorStateList.valueOf(Color.WHITE)
@@ -955,5 +1043,6 @@ class ScanFragment : Fragment() {
         private const val STATE_CAMERA = "overrideCameraId"
         private const val MAX_STILL_ZOOM = 8f
         private const val DOUBLE_TAP_ZOOM = 2.5f
+        private const val ZOOM_SMOOTH_MS = 90f
     }
 }
