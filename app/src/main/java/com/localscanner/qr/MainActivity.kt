@@ -275,6 +275,18 @@ class MainActivity : AppCompatActivity() {
                     picture.recycle()
                     return@post
                 }
+                val first = codes.firstOrNull()
+                if (first != null && !store.getSettings().multiScan) {
+                    // Multiple scan off: skip the image preview and open the code directly.
+                    picture.recycle()
+                    Actions.feedback(this)
+                    if (onCodeDetected(first.text, first.format, false)) {
+                        scan.onImagePickStarted()
+                    } else {
+                        scan.onImagePickCancelled()
+                    }
+                    return@post
+                }
                 scan.showStill(picture, codes)
             }
         }
