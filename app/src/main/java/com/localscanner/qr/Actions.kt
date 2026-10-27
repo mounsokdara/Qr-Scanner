@@ -86,12 +86,12 @@ object Actions {
         return clip.getItemAt(0).coerceToText(context)?.toString().orEmpty()
     }
 
-    fun shareText(context: Context, text: String) {
+    fun shareText(context: Context, text: String, title: String = context.getString(R.string.share)) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
         }
-        launch(context, Intent.createChooser(intent, context.getString(R.string.share)))
+        launch(context, Intent.createChooser(intent, title))
     }
 
     fun shareBitmap(context: Context, bitmap: Bitmap) {

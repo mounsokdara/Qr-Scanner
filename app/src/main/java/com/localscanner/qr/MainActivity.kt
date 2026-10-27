@@ -217,7 +217,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSettings() = showRoot(SettingsFragment(), R.id.nav_settings)
 
     private fun shareApp() {
-        Actions.shareText(this, getString(R.string.share_promo))
+        Actions.shareText(this, getString(R.string.share_promo), getString(R.string.share_app_title))
     }
 
     private fun handleBack() {

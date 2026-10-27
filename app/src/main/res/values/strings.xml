@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">QR &amp; Barcode Scanner</string>
-    <string name="share_promo">I\'m using QR &amp; Barcode Scanner, the fastest QR and Barcode reader.</string>
+    <string name="share_promo">Try QR &amp; Barcode Scanner, a fast and free scanner that reads QR codes and barcodes, even several at once, and lets you create your own. Give it a go!</string>
+    <string name="share_app_title">Share this app</string>
     <string name="our_apps_subtitle">The fastest QR and Barcode reader.</string>
     <string name="my_qr_help">Share your contact info via QR. Only enter data you want to share. When done click the check mark. Next time you open My QR your contact QR will be displayed.</string>
     <string name="invalid_entry">Invalid entry</string>
