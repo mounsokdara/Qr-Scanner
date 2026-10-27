@@ -171,6 +171,7 @@ class ScanFragment : Fragment() {
         binding.btnMenu.setOnClickListener {
             (activity as? MainActivity)?.openDrawer()
         }
+        if ((activity as? MainActivity)?.navPermanent == true) binding.btnMenu.visibility = View.GONE
         binding.btnGallery.setOnClickListener {
             (activity as? MainActivity)?.pickImage()
         }

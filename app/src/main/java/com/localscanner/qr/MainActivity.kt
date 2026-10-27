@@ -22,6 +22,10 @@ class MainActivity : AppCompatActivity() {
     lateinit var store: Store
         private set
     private var currentNavId: Int = R.id.nav_scan
+
+    /** True on wide screens, where the navigation list is always visible beside the content. */
+    var navPermanent: Boolean = false
+        private set
     private var menuListener: ((MenuItem) -> Boolean)? = null
     private val io = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -38,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        navPermanent = resources.getBoolean(R.bool.nav_permanent)
         store = Store(this)
         binding.drawerLayout.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimary))
         if (savedInstanceState != null) {
@@ -69,11 +74,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openDrawer() {
+        if (navPermanent) return
         binding.drawerLayout.openDrawer(GravityCompat.START)
+    }
+
+    private fun closeDrawer() {
+        if (navPermanent) return
+        binding.drawerLayout.closeDrawer(GravityCompat.START)
     }
 
     /** Edge-swipe opening of the menu; the menu button keeps working when disabled. */
     fun setDrawerSwipeEnabled(enabled: Boolean) {
+        if (navPermanent) return
         val mode = if (enabled) {
             androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_UNLOCKED
         } else {
@@ -103,6 +115,9 @@ class MainActivity : AppCompatActivity() {
             binding.toolbar.setNavigationOnClickListener {
                 onBackPressedDispatcher.onBackPressed()
             }
+        } else if (navPermanent) {
+            binding.toolbar.navigationIcon = null
+            binding.toolbar.setNavigationOnClickListener(null)
         } else {
             binding.toolbar.setNavigationIcon(R.drawable.ic_menu)
             binding.toolbar.setNavigationOnClickListener { openDrawer() }
@@ -187,7 +202,7 @@ class MainActivity : AppCompatActivity() {
                     binding.navigationView.setCheckedItem(currentNavId)
                 }
             }
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
+            closeDrawer()
             true
         }
     }
@@ -221,8 +236,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleBack() {
-        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        if (!navPermanent && binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            closeDrawer()
             return
         }
         if (supportFragmentManager.backStackEntryCount > 0) {
