@@ -192,22 +192,28 @@ object CodeGeometry {
         return inside
     }
 
-    fun dedupe(codes: List<DetectedCode>): List<DetectedCode> {
+    private const val DUPLICATE_TOLERANCE = 0.35f
+    private const val MIN_DUPLICATE_DISTANCE = 12f
+
+    /** True when both codes read the same text and sit at (nearly) the same place. */
+    fun isSame(a: DetectedCode, b: DetectedCode, tolerance: Float = DUPLICATE_TOLERANCE): Boolean {
+        if (a.text != b.text || a.format != b.format) return false
+        val boxA = a.box()
+        val boxB = b.box()
+        if (boxA.size < 4 || boxB.size < 4) return false
+        val ax = boxA.map { it.x }.average().toFloat()
+        val ay = boxA.map { it.y }.average().toFloat()
+        val bx = boxB.map { it.x }.average().toFloat()
+        val by = boxB.map { it.y }.average().toFloat()
+        val diag = hypot(boxB[2].x - boxB[0].x, boxB[2].y - boxB[0].y)
+        return hypot(ax - bx, ay - by) < max(MIN_DUPLICATE_DISTANCE, tolerance * diag)
+    }
+
+    fun dedupe(codes: List<DetectedCode>, tolerance: Float = DUPLICATE_TOLERANCE): List<DetectedCode> {
         val kept = ArrayList<DetectedCode>()
         for (code in codes) {
-            val box = code.box()
-            if (box.isEmpty()) continue
-            val cx = box.map { it.x }.average().toFloat()
-            val cy = box.map { it.y }.average().toFloat()
-            val duplicate = kept.any { other ->
-                if (other.text != code.text || other.format != code.format) return@any false
-                val ob = other.box()
-                val ox = ob.map { it.x }.average().toFloat()
-                val oy = ob.map { it.y }.average().toFloat()
-                val diag = hypot(ob[2].x - ob[0].x, ob[2].y - ob[0].y)
-                hypot(cx - ox, cy - oy) < max(40f, 0.6f * diag)
-            }
-            if (!duplicate) kept.add(code)
+            if (code.box().isEmpty()) continue
+            if (kept.none { isSame(it, code, tolerance) }) kept.add(code)
         }
         return kept
     }

@@ -6,11 +6,13 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.LuminanceSource
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.ReaderException
 import com.google.zxing.Result
+import com.google.zxing.common.BitArray
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
-import com.google.zxing.multi.GenericMultipleBarcodeReader
 import com.google.zxing.multi.qrcode.QRCodeMultiReader
+import com.google.zxing.oned.MultiFormatOneDReader
 import com.google.zxing.qrcode.detector.FinderPattern
 import kotlin.math.max
 import kotlin.math.min
@@ -36,11 +38,54 @@ object CodeDecoder {
         BarcodeFormat.AZTEC
     )
 
-    fun decodeLive(source: LuminanceSource, multi: Boolean, allowInverted: Boolean): List<DetectedCode> {
-        var codes = liveOnce(source, multi)
+    private val ONE_D_FORMATS: List<BarcodeFormat> = listOf(
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.ITF,
+        BarcodeFormat.CODABAR
+    )
+
+    private val OTHER_2D_FORMATS: List<BarcodeFormat> = listOf(
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.PDF_417,
+        BarcodeFormat.AZTEC
+    )
+
+    // Formats without a strong check digit must be read on several rows to be trusted.
+    private val WEAK_ROW_FORMATS: Set<String> = setOf(
+        BarcodeFormat.CODE_39.name,
+        BarcodeFormat.CODE_93.name,
+        BarcodeFormat.ITF.name,
+        BarcodeFormat.CODABAR.name
+    )
+
+    private const val ROW_SCAN_DIVISOR = 120
+    private const val ROW_MIN_STEP = 2
+    private const val ROW_MIN_CONTRAST = 48
+    private const val ROW_THRESHOLD_BIAS = 0.9f
+    private const val ROW_WINDOW_DIVISOR = 10
+    private const val ROW_MIN_WINDOW = 24
+    private const val ROW_GAP_STEPS = 4
+    private const val ROW_MIN_OVERLAP = 0.5f
+    private const val WEAK_MIN_ROWS = 2
+    private const val RECUR_MIN_DIMENSION = 100
+    private const val RECUR_MAX_DEPTH = 4
+
+    fun decodeLive(
+        source: LuminanceSource,
+        multi: Boolean,
+        allowInverted: Boolean,
+        extras: Boolean = true
+    ): List<DetectedCode> {
+        var codes = liveOnce(source, multi, extras)
         if (codes.isEmpty() && allowInverted) {
             codes = try {
-                liveOnce(source.invert(), multi)
+                liveOnce(source.invert(), multi, extras)
             } catch (_: Exception) {
                 emptyList()
             }
@@ -48,17 +93,138 @@ object CodeDecoder {
         return codes
     }
 
-    private fun liveOnce(source: LuminanceSource, multi: Boolean): List<DetectedCode> {
+    private fun liveOnce(source: LuminanceSource, multi: Boolean, extras: Boolean): List<DetectedCode> {
+        if (multi) return liveMulti(source, extras)
         val bitmap = BinaryBitmap(HybridBinarizer(source))
-        val found: List<DetectedCode> = if (multi) {
-            val hints = baseHints(false)
-            multiQr(bitmap, hints) + multiGeneric(bitmap, hints)
-        } else {
-            listOfNotNull(decodeSingle(bitmap)?.let { toCode(it) })
-        }
+        val found = listOfNotNull(decodeSingle(bitmap)?.let { toCode(it) })
+        return if (found.isEmpty()) emptyList() else CodeGeometry.dedupe(found)
+    }
+
+    /**
+     * Finds every code in one frame. QR codes come from the QR multi reader, 1D barcodes from a
+     * dense row scan, and the rarer 2D formats are checked on alternate frames. Codes with the
+     * same text are kept apart when they sit at different places in the frame.
+     */
+    private fun liveMulti(source: LuminanceSource, extras: Boolean): List<DetectedCode> {
+        val luma = Luma.of(source)
+        val bitmap = BinaryBitmap(HybridBinarizer(source))
+        val hints = baseHints(false)
+        val found = ArrayList<DetectedCode>()
+        found.addAll(multiQr(bitmap, hints))
+        found.addAll(scanRows(luma))
+        if (extras) found.addAll(multiOther2D(bitmap))
         if (found.isEmpty()) return emptyList()
-        val unique = CodeGeometry.dedupe(found)
-        return if (multi) BoxRefiner.refineAll(Luma.of(source), unique) else unique
+        return CodeGeometry.dedupe(BoxRefiner.refineAll(luma, CodeGeometry.dedupe(found)))
+    }
+
+    private class RowHit(val text: String, val format: String, val x0: Float, val x1: Float, val y: Int)
+
+    private fun scanRows(luma: Luma): List<DetectedCode> {
+        val width = luma.width
+        val height = luma.height
+        if (width < 2 * ROW_MIN_WINDOW || height < 2 * ROW_MIN_STEP) return emptyList()
+        val hints = HashMap<DecodeHintType, Any>()
+        hints[DecodeHintType.POSSIBLE_FORMATS] = ONE_D_FORMATS
+        val reader = MultiFormatOneDReader(hints)
+        val bits = BitArray(width)
+        val sums = IntArray(width + 1)
+        val step = max(ROW_MIN_STEP, height / ROW_SCAN_DIVISOR)
+        val radius = max(ROW_MIN_WINDOW, width / ROW_WINDOW_DIVISOR)
+        val hits = ArrayList<RowHit>()
+        var y = step / 2
+        while (y < height) {
+            if (binarizeRow(luma.data, y * width, width, sums, radius, bits)) {
+                decodeRowBothWays(reader, hints, bits, y, width)?.let { hits.add(it) }
+            }
+            y += step
+        }
+        return clusterRowHits(hits, step)
+    }
+
+    /** Local-mean threshold for one row; returns false when the row is too flat to hold bars. */
+    private fun binarizeRow(
+        data: ByteArray,
+        offset: Int,
+        width: Int,
+        sums: IntArray,
+        radius: Int,
+        out: BitArray
+    ): Boolean {
+        var lo = 255
+        var hi = 0
+        sums[0] = 0
+        for (x in 0 until width) {
+            val v = data[offset + x].toInt() and 0xFF
+            sums[x + 1] = sums[x] + v
+            if (v < lo) lo = v
+            if (v > hi) hi = v
+        }
+        if (hi - lo < ROW_MIN_CONTRAST) return false
+        out.clear()
+        for (x in 0 until width) {
+            val from = max(0, x - radius)
+            val to = min(width, x + radius + 1)
+            val mean = (sums[to] - sums[from]).toFloat() / (to - from)
+            if ((data[offset + x].toInt() and 0xFF) < mean * ROW_THRESHOLD_BIAS) out.set(x)
+        }
+        return true
+    }
+
+    private fun decodeRowBothWays(
+        reader: MultiFormatOneDReader,
+        hints: Map<DecodeHintType, Any>,
+        bits: BitArray,
+        y: Int,
+        width: Int
+    ): RowHit? {
+        for (attempt in 0..1) {
+            if (attempt == 1) bits.reverse()
+            try {
+                val result = reader.decodeRow(y, bits, hints)
+                val text = result.text?.trim().orEmpty()
+                val points = result.resultPoints
+                if (!Parsers.isReadable(text) || points == null || points.size < 2) return null
+                var a = points.first().x
+                var b = points.last().x
+                if (attempt == 1) {
+                    a = (width - 1) - a
+                    b = (width - 1) - b
+                }
+                return RowHit(text, result.barcodeFormat.name, min(a, b), max(a, b), y)
+            } catch (_: ReaderException) {
+            }
+        }
+        return null
+    }
+
+    /** Rows that read the same code at the same place are one barcode; other places stay separate. */
+    private fun clusterRowHits(hits: List<RowHit>, step: Int): List<DetectedCode> {
+        val clusters = ArrayList<ArrayList<RowHit>>()
+        for (hit in hits) {
+            val target = clusters.firstOrNull { cluster ->
+                val last = cluster.last()
+                if (last.text != hit.text || last.format != hit.format) return@firstOrNull false
+                if (hit.y - last.y > step * ROW_GAP_STEPS) return@firstOrNull false
+                val overlap = min(last.x1, hit.x1) - max(last.x0, hit.x0)
+                overlap >= ROW_MIN_OVERLAP * max(last.x1 - last.x0, hit.x1 - hit.x0)
+            }
+            if (target != null) target.add(hit) else clusters.add(arrayListOf(hit))
+        }
+        val out = ArrayList<DetectedCode>(clusters.size)
+        for (cluster in clusters) {
+            val mid = cluster[cluster.size / 2]
+            if (mid.format in WEAK_ROW_FORMATS && cluster.size < WEAK_MIN_ROWS) continue
+            val y = mid.y.toFloat()
+            out.add(DetectedCode(mid.text, mid.format, listOf(Pt(mid.x0, y), Pt(mid.x1, y))))
+        }
+        return out
+    }
+
+    private fun multiOther2D(bitmap: BinaryBitmap): List<DetectedCode> {
+        val hints = HashMap<DecodeHintType, Any>()
+        hints[DecodeHintType.POSSIBLE_FORMATS] = OTHER_2D_FORMATS
+        hints[DecodeHintType.CHARACTER_SET] = "UTF-8"
+        return multiGeneric(bitmap, hints)
     }
 
     fun decodeStillSource(source: LuminanceSource): List<DetectedCode> {
@@ -77,7 +243,7 @@ object CodeDecoder {
             for (make in attempts) {
                 val found = decodeAllThorough(make())
                 if (found.isNotEmpty()) {
-                    return BoxRefiner.refineAll(Luma.of(variant), CodeGeometry.dedupe(found))
+                    return CodeGeometry.dedupe(BoxRefiner.refineAll(Luma.of(variant), CodeGeometry.dedupe(found)))
                 }
             }
         }
@@ -154,7 +320,7 @@ object CodeDecoder {
                 for (make in binarizers) {
                     val found = decodeAllThorough(make())
                     if (found.isEmpty()) continue
-                    val refined = BoxRefiner.refineAll(variant.gray, CodeGeometry.dedupe(found))
+                    val refined = CodeGeometry.dedupe(BoxRefiner.refineAll(variant.gray, CodeGeometry.dedupe(found)))
                     val inverse = 1f / variant.scale
                     return refined.map { code ->
                         code.transformed({ p -> Pt(p.x * inverse + x0, p.y * inverse + y0) }, inverse)
@@ -173,13 +339,56 @@ object CodeDecoder {
         return out
     }
 
+    /**
+     * Same idea as ZXing's GenericMultipleBarcodeReader, but a code is only skipped when the same
+     * text was already found at the same place, so identical codes side by side are all kept.
+     */
     private fun multiGeneric(bitmap: BinaryBitmap, hints: Map<DecodeHintType, Any>): List<DetectedCode> {
-        return try {
-            val reader = MultiFormatReader()
-            reader.setHints(hints)
-            GenericMultipleBarcodeReader(reader).decodeMultiple(bitmap, hints).mapNotNull { toCode(it) }
+        val reader = MultiFormatReader()
+        reader.setHints(hints)
+        val out = ArrayList<DetectedCode>()
+        decodeRegion(reader, bitmap, 0, 0, 0, out)
+        return out
+    }
+
+    private fun decodeRegion(
+        reader: MultiFormatReader,
+        image: BinaryBitmap,
+        xOffset: Int,
+        yOffset: Int,
+        depth: Int,
+        out: MutableList<DetectedCode>
+    ) {
+        if (depth > RECUR_MAX_DEPTH) return
+        val result = try {
+            reader.decodeWithState(image)
         } catch (_: Exception) {
-            emptyList()
+            return
+        }
+        val raw = result.resultPoints?.filterNotNull().orEmpty()
+        val code = toCode(result)?.transformed({ p -> Pt(p.x + xOffset, p.y + yOffset) })
+        if (code != null) {
+            if (out.any { CodeGeometry.isSame(it, code) }) return
+            out.add(code)
+        }
+        if (raw.isEmpty() || !image.isCropSupported) return
+        val width = image.width
+        val height = image.height
+        val minX = raw.minOf { it.x }.toInt().coerceIn(0, width)
+        val maxX = raw.maxOf { it.x }.toInt().coerceIn(0, width)
+        val minY = raw.minOf { it.y }.toInt().coerceIn(0, height)
+        val maxY = raw.maxOf { it.y }.toInt().coerceIn(0, height)
+        if (minX > RECUR_MIN_DIMENSION) {
+            decodeRegion(reader, image.crop(0, 0, minX, height), xOffset, yOffset, depth + 1, out)
+        }
+        if (minY > RECUR_MIN_DIMENSION) {
+            decodeRegion(reader, image.crop(0, 0, width, minY), xOffset, yOffset, depth + 1, out)
+        }
+        if (maxX < width - RECUR_MIN_DIMENSION) {
+            decodeRegion(reader, image.crop(maxX, 0, width - maxX, height), xOffset + maxX, yOffset, depth + 1, out)
+        }
+        if (maxY < height - RECUR_MIN_DIMENSION) {
+            decodeRegion(reader, image.crop(0, maxY, width, height - maxY), xOffset, yOffset + maxY, depth + 1, out)
         }
     }
 

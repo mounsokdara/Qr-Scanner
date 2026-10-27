@@ -16,6 +16,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 object Decoder {
+    private const val FRAME_CYCLE = 3
+    private const val EXTRAS_TICK = 1
     private var invertTick = 0
 
     @Volatile private var latestFrame: LuminanceSource? = null
@@ -29,11 +31,12 @@ object Decoder {
             null
         } ?: return null
         latestFrame = source
-        invertTick = (invertTick + 1) % 3
+        invertTick = (invertTick + 1) % FRAME_CYCLE
         val allowInverted = invertTick == 0
+        val extras = invertTick == EXTRAS_TICK
         val codes = try {
             if (multi) {
-                CodeDecoder.decodeLive(source, true, allowInverted)
+                CodeDecoder.decodeLive(source, true, allowInverted, extras)
             } else {
                 decodeInSquare(source, viewW, viewH, mirror, allowInverted)
             }

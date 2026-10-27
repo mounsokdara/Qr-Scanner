@@ -119,7 +119,15 @@ class ScanFragment : Fragment() {
     private var stillCount = 0
     private var stillGeneration = 0
     private lateinit var stillExecutor: ExecutorService
+    private class Tracked(var code: DetectedCode, var frame: Long, var seenAt: Long)
+
+    private val tracked = ArrayList<Tracked>()
+    private var trackedW = 0
+    private var trackedH = 0
+    private var trackedFrame = 0L
+
     private val clearOverlay = Runnable {
+        tracked.clear()
         _binding?.scanFrame?.setLocked(false)
         _binding?.codeOverlay?.clear()
         updateHint(0)
@@ -1011,8 +1019,9 @@ class ScanFragment : Fragment() {
         binding.scanFrame.setLocked(true)
         mainHandler.removeCallbacks(clearOverlay)
         mainHandler.postDelayed(clearOverlay, 450L)
+        val visible = if (multiScan) mergeTracked(frame) else frame.codes
         if (multiScan) {
-            val items = frame.codes.map { code ->
+            val items = visible.map { code ->
                 val risky = isRisky(code.text)
                 CodeOverlayView.Item(code, Labels.chip(context, code.text, code.format, risky), risky)
             }
@@ -1027,7 +1036,7 @@ class ScanFragment : Fragment() {
                 Actions.feedback(context)
                 (activity as? MainActivity)?.onCodeDetected(code.text, code.format, true)
             }
-            updateHint(frame.codes.size)
+            updateHint(visible.size)
             return
         }
         if (!multiScan) {
@@ -1035,7 +1044,35 @@ class ScanFragment : Fragment() {
             onLiveCode(first.text, first.format)
             return
         }
-        updateHint(frame.codes.size)
+        updateHint(visible.size)
+    }
+
+    /**
+     * A single frame can miss a code that the previous frame saw. Keeping codes for a short time
+     * after they were last seen makes every box stay steady instead of flickering or hopping.
+     */
+    private fun mergeTracked(frame: Decoder.LiveFrame): List<DetectedCode> {
+        val now = SystemClock.elapsedRealtime()
+        if (frame.width != trackedW || frame.height != trackedH) {
+            tracked.clear()
+            trackedW = frame.width
+            trackedH = frame.height
+        }
+        trackedFrame++
+        for (code in frame.codes) {
+            val match = tracked.firstOrNull {
+                it.frame != trackedFrame && CodeGeometry.isSame(it.code, code, TRACK_MATCH_TOLERANCE)
+            }
+            if (match != null) {
+                match.code = code
+                match.frame = trackedFrame
+                match.seenAt = now
+            } else {
+                tracked.add(Tracked(code, trackedFrame, now))
+            }
+        }
+        tracked.removeAll { now - it.seenAt > TRACK_TTL_MS }
+        return tracked.map { it.code }
     }
 
     private fun onLiveCode(text: String, format: String) {
@@ -1056,5 +1093,7 @@ class ScanFragment : Fragment() {
         private const val MAX_STILL_ZOOM = 8f
         private const val DOUBLE_TAP_ZOOM = 2.5f
         private const val ZOOM_SMOOTH_MS = 90f
+        private const val TRACK_TTL_MS = 300L
+        private const val TRACK_MATCH_TOLERANCE = 0.6f
     }
 }
